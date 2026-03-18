@@ -562,12 +562,11 @@
                 if (document.getElementById('app-content')) {
                     // Call applyFilters to ensure the displayed records match the current filter state
                     // This is crucial because globalData.records has just been updated
-                    if (currentView === 'history') { // Only apply filters if we are on the history page
+                    if (currentView === 'history') {
                         applyFilters();
-                    } else if (currentView === 'importRecords' || currentView === 'changePassword') {
-                        renderApp(); // Rerender for these pages if data changes
+                    } else {
+                        renderApp();
                     }
-                    // For adminManage views, they already explicitly call renderApp when their specific data changes
                 }
             }, (error) => {
                 console.error(`[fetchDataWithListener] Erro ao carregar ${collectionName} (dataKey: ${dataKey}). Path: ${collRef.path}. Query Constraints:`, qConstraints, "Objeto do Erro Firebase:", error);
