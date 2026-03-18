@@ -288,7 +288,7 @@
             </div>
         </header>
 
-        <main id="app-content" class="max-w-screen-xl mx-auto w-full px-4 md:px-6 lg:px-8 py-6 flex-grow">
+        <main id="app-content" class="max-w-screen-2xl mx-auto w-full px-4 md:px-6 lg:px-8 py-6 flex-grow">
             <div id="initial-loading" class="flex flex-col items-center justify-center min-h-[60vh]">
                 <div class="loader mb-4"></div>
                 <p style="color:var(--apple-3rd);font-size:14px">Inicializando aplicação...</p>
@@ -2552,8 +2552,9 @@
                 });
 
                 recordHistoryTableContainer.addEventListener('click', (event) => {
-                    if (event.target.classList.contains('btn-delete-record')) {
-                        const recordId = event.target.dataset.id;
+                    const deleteBtn = event.target.closest('.btn-delete-record');
+                    if (deleteBtn) {
+                        const recordId = deleteBtn.dataset.id;
                         confirmAction(
                             `Confirmar Exclusão`,
                             `Tem certeza que deseja excluir este registro? Esta ação não pode ser desfeita.`,
