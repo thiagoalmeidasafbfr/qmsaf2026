@@ -224,6 +224,42 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
+        // Categorias fixas de jogo
+        const GAME_CATEGORIES = [
+            'Futebol Masculino Profissional',
+            'Sub-20 Masculino',
+            'Sub-17 Masculino',
+            'Sub-15 Masculino',
+            'Demais Categorias Masculino',
+            'Futebol Profissional Feminino',
+            'Futebol de Base Feminino'
+        ];
+
+        // Horários de 00:00 a 23:45 em intervalos de 15 minutos
+        const GAME_TIMES = (() => {
+            const times = [];
+            for (let h = 0; h < 24; h++) {
+                for (let m = 0; m < 60; m += 15) {
+                    times.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+                }
+            }
+            return times;
+        })();
+
+        // Calcula a classificação QM (A/B/C/D) e valor com base no tipo do funcionário, data e horário
+        function computeQMClassification(qmType, eventDate, gameTime) {
+            const dateObj = new Date(eventDate + 'T00:00:00');
+            const dayOfWeek = dateObj.getDay(); // 0=Dom, 6=Sáb
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+            const [hours, minutes] = gameTime.split(':').map(Number);
+            const isAfter21 = hours > 21 || (hours === 21 && minutes > 0);
+            if (isWeekend || isAfter21) {
+                return qmType === 'A' ? { classification: 'A', value: 400 } : { classification: 'B', value: 200 };
+            } else {
+                return qmType === 'A' ? { classification: 'C', value: 200 } : { classification: 'D', value: 100 };
+            }
+        }
+
         const appHeader = document.getElementById('app-header');
         const appContent = document.getElementById('app-content');
         const appFooter = document.getElementById('app-footer');
@@ -251,7 +287,7 @@
             searchTerm: '',
             eventName: '',
             employeeId: '',
-            categoryId: '',
+            gameCategory: '',
             notes: '',
             sector: '', // Only for admin
             managerName: '', // Only for admin
@@ -266,7 +302,7 @@
             'filter-search': 'searchTerm',
             'filter-event-name': 'eventName',
             'filter-employee': 'employeeId',
-            'filter-category': 'categoryId',
+            'filter-category': 'gameCategory',
             'filter-notes': 'notes',
             'filter-sector': 'sector',
             'filter-manager': 'managerName',
@@ -948,7 +984,8 @@
                         [
                             { name: 'name', label: 'Nome do Funcionário', type: 'text' },
                             { name: 'registration', label: 'Matrícula', type: 'text' },
-                            { name: 'sector', label: 'Setor', type: 'select', options: globalData.sectors.map(s => ({ value: s.name, label: s.name })) }
+                            { name: 'sector', label: 'Setor', type: 'select', options: globalData.sectors.map(s => ({ value: s.name, label: s.name })) },
+                            { name: 'qmType', label: 'Tipo QM', type: 'select', options: [{ value: 'A', label: 'QM A (R$ 400/200)' }, { value: 'B', label: 'QM B (R$ 200/100)' }] }
                         ],
                         (data) => addItemToFirestore('employees', data),
                         (id, data) => updateItemInFirestore('employees', id, data),
@@ -1347,11 +1384,12 @@
 
         // Renderiza o formulário para inclusão de novo registro
         function renderNewRecordForm() {
-            const categoriesOptions = globalData.categories.map(cat => `<option value="${cat.id}">${cat.name} - ${cat.description}</option>`).join('');
             // Filtra funcionários pelo setor do gestor, se não for admin
             const employeesFilteredBySector = userProfile.isAdmin ? globalData.employees : globalData.employees.filter(emp => emp.sector === userProfile.sector);
             const employeesOptions = employeesFilteredBySector.map(emp => `<option value="${emp.id}">${emp.name} (${emp.registration}) - ${emp.sector}</option>`).join('') + '<option value="OUTROS">Outros</option>';
             const inputBaseClass = "w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-800 placeholder-gray-400 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors";
+            const gameCatOptions = GAME_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+            const gameTimeOptions = GAME_TIMES.map(t => `<option value="${t}">${t}</option>`).join('');
 
             appContent.innerHTML = `
                 <div class="max-w-xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow-lg border border-gray-200 animate-fadeIn">
@@ -1361,13 +1399,25 @@
                             <label for="eventName" class="block text-xs font-medium text-gray-600 mb-1">Nome do Evento:</label>
                             <input type="text" id="eventName" required class="${inputBaseClass}" placeholder="Ex: Jogo Botafogo vs Flamengo">
                         </div>
-                        <div>
-                            <label for="eventDate" class="block text-xs font-medium text-gray-600 mb-1">Data do Evento:</label>
-                            <input type="date" id="eventDate" required class="${inputBaseClass}">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="eventDate" class="block text-xs font-medium text-gray-600 mb-1">Data do Jogo:</label>
+                                <input type="date" id="eventDate" required class="${inputBaseClass}">
+                            </div>
+                            <div>
+                                <label for="gameTime" class="block text-xs font-medium text-gray-600 mb-1">Horário do Jogo:</label>
+                                <select id="gameTime" required class="${inputBaseClass}">
+                                    <option value="">Selecione o horário</option>
+                                    ${gameTimeOptions}
+                                </select>
+                            </div>
                         </div>
                         <div>
-                            <label for="category" class="block text-xs font-medium text-gray-600 mb-1">Classificação (Quadro Móvel):</label>
-                            <select id="category" required class="${inputBaseClass}">${categoriesOptions ? `<option value="">Selecione a Classificação</option>${categoriesOptions}` : `<option value="">Nenhuma categoria cadastrada</option>`}</select>
+                            <label for="gameCategory" class="block text-xs font-medium text-gray-600 mb-1">Categoria do Jogo:</label>
+                            <select id="gameCategory" required class="${inputBaseClass}">
+                                <option value="">Selecione a Categoria</option>
+                                ${gameCatOptions}
+                            </select>
                         </div>
                         <div>
                             <label for="employee" class="block text-xs font-medium text-gray-600 mb-1">Funcionário:</label>
@@ -1400,7 +1450,8 @@
 
                 const eventName = document.getElementById('eventName').value;
                 const eventDate = document.getElementById('eventDate').value;
-                const categoryId = document.getElementById('category').value;
+                const gameTime = document.getElementById('gameTime').value;
+                const gameCategory = document.getElementById('gameCategory').value;
                 const employeeId = document.getElementById('employee').value;
                 const notes = document.getElementById('notes').value;
 
@@ -1418,21 +1469,25 @@
                     return;
                 }
 
-                if (!eventName || !eventDate || !categoryId || !employeeId) {
-                    showNotification("Nome do Evento, Data do Evento, Categoria e Funcionário são obrigatórios.", "error");
+                if (!eventName || !eventDate || !gameTime || !gameCategory || !employeeId) {
+                    showNotification("Nome do Evento, Data, Horário, Categoria do Jogo e Funcionário são obrigatórios.", "error");
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalButtonContent;
                     return;
                 }
 
-                const employeeName = employeeId === 'OUTROS'
-                    ? notes.trim()
-                    : globalData.employees.find(emp => emp.id === employeeId)?.name;
+                const employee = employeeId === 'OUTROS' ? null : globalData.employees.find(emp => emp.id === employeeId);
+                const employeeName = employeeId === 'OUTROS' ? notes.trim() : employee?.name;
+                const qmType = employee?.qmType || 'B';
+                const qmResult = computeQMClassification(qmType, eventDate, gameTime);
 
                 const newRecordData = {
                     eventName,
                     eventDate,
-                    categoryId, categoryName: globalData.categories.find(cat => cat.id === categoryId)?.name,
+                    gameTime,
+                    gameCategory,
+                    qmClassification: qmResult.classification,
+                    qmValue: qmResult.value,
                     employeeId,
                     employeeName,
                     notes
@@ -1499,7 +1554,7 @@
                 return;
             }
 
-            const headers = ["Nome do Evento", "Data do Evento", "Classificação", "Funcionário", "Observações"];
+            const headers = ["Nome do Evento", "Data do Evento", "Horário do Jogo", "Categoria do Jogo", "Funcionário", "Observações"];
             const mainSheetName = "Registros";
             const listsSheetName = "Listas"; // Name for the lists sheet
 
@@ -1514,8 +1569,13 @@
             // Main sheet: Row 1 has headers. No data in subsequent rows.
             const ws = XLSX.utils.aoa_to_sheet([headers]);
 
-            // Create lists sheet with only employee names
-            const wsLists = XLSX.utils.aoa_to_sheet([["Funcionários"], ...employeesForLists.map(name => [name])]); // Column A: Employee names
+            // Create lists sheet with employees, game times and game categories
+            const maxRows = Math.max(employeesForLists.length, GAME_TIMES.length, GAME_CATEGORIES.length);
+            const listsData = [["Funcionários", "Horários", "Categorias do Jogo"]];
+            for (let i = 0; i < maxRows; i++) {
+                listsData.push([employeesForLists[i] || '', GAME_TIMES[i] || '', GAME_CATEGORIES[i] || '']);
+            }
+            const wsLists = XLSX.utils.aoa_to_sheet(listsData);
 
             // No data validations or dropdowns are added to the main sheet.
             // This ensures the main sheet is clean as requested.
@@ -1606,7 +1666,7 @@
                     const allRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                     const headers = allRows[0].map(h => String(h).trim());
 
-                    const expectedHeaders = ["Nome do Evento", "Data do Evento", "Classificação", "Funcionário", "Observações"];
+                    const expectedHeaders = ["Nome do Evento", "Data do Evento", "Horário do Jogo", "Categoria do Jogo", "Funcionário", "Observações"];
                     const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
 
                     if (missingHeaders.length > 0) {
@@ -1645,12 +1705,24 @@
                         try {
                             const eventName = record["Nome do Evento"];
                             const eventDateRaw = record["Data do Evento"]; // This is now already a string thanks to raw:false and String() conversion
-                            const categoryName = record["Classificação"];
+                            const gameTimeRaw = record["Horário do Jogo"];
+                            const gameCategory = record["Categoria do Jogo"];
                             const employeeName = record["Funcionário"];
                             const notes = record["Observações"] || '';
 
-                            if (!eventName || !eventDateRaw || !categoryName || !employeeName) {
-                                throw new Error("Campos obrigatórios (Nome do Evento, Data do Evento, Classificação, Funcionário) não podem estar vazios.");
+                            if (!eventName || !eventDateRaw || !gameTimeRaw || !gameCategory || !employeeName) {
+                                throw new Error("Campos obrigatórios (Nome do Evento, Data do Evento, Horário do Jogo, Categoria do Jogo, Funcionário) não podem estar vazios.");
+                            }
+
+                            // Valida horário do jogo
+                            if (!GAME_TIMES.includes(gameTimeRaw.trim())) {
+                                throw new Error(`Horário '${gameTimeRaw}' inválido. Use o formato HH:MM em intervalos de 15 minutos (ex: 18:00, 20:30).`);
+                            }
+                            const gameTime = gameTimeRaw.trim();
+
+                            // Valida categoria do jogo
+                            if (!GAME_CATEGORIES.includes(gameCategory.trim())) {
+                                throw new Error(`Categoria '${gameCategory}' inválida. Use uma das categorias disponíveis na aba Listas.`);
                             }
 
                             // Validação e formatação da data do evento
@@ -1676,12 +1748,7 @@
                             }
 
 
-                            const category = globalData.categories.find(c => c.name?.toLowerCase() === categoryName.toLowerCase());
-                            if (!category) {
-                                throw new Error(`Categoria '${categoryName}' não encontrada na base de dados. Cadastre a categoria primeiro.`);
-                            }
-
-                            let employeeId; let finalEmployeeName;
+                            let employeeId; let finalEmployeeName; let foundEmployee = null;
                             if (employeeName.toLowerCase() === 'outros') {
                                 if (!notes.trim()) {
                                     throw new Error("Funcionário marcado como 'Outros', mas 'Observações' está vazio. Informe o nome completo do funcionário.");
@@ -1690,19 +1757,24 @@
                                 finalEmployeeName = notes.trim();
                             } else {
                                 const employeesInSector = userProfile.isAdmin ? globalData.employees : globalData.employees.filter(emp => emp.sector === userProfile.sector);
-                                const employee = employeesInSector.find(emp => emp.name?.toLowerCase() === employeeName.toLowerCase());
-                                if (!employee) {
+                                foundEmployee = employeesInSector.find(emp => emp.name?.toLowerCase() === employeeName.toLowerCase());
+                                if (!foundEmployee) {
                                     throw new Error(`Funcionário '${employeeName}' não encontrado ou não pertence ao seu setor ('${userProfile.sector}').`);
                                 }
-                                employeeId = employee.id;
-                                finalEmployeeName = employee.name;
+                                employeeId = foundEmployee.id;
+                                finalEmployeeName = foundEmployee.name;
                             }
+
+                            const qmType = foundEmployee?.qmType || 'B';
+                            const qmResult = computeQMClassification(qmType, eventDate, gameTime);
 
                             const dataToSave = {
                                 eventName,
                                 eventDate,
-                                categoryId: category.id,
-                                categoryName: category.name,
+                                gameTime,
+                                gameCategory: gameCategory.trim(),
+                                qmClassification: qmResult.classification,
+                                qmValue: qmResult.value,
                                 employeeId,
                                 employeeName: finalEmployeeName,
                                 notes,
@@ -1846,8 +1918,9 @@
                             <input type="checkbox" class="record-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-2" data-id="${record.id}" ${selectedRecordIds.has(record.id) ? 'checked' : ''}>
                             ${record.createdAt?.toDate?.().toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}) || 'N/A'}
                         </td>
-                        <td class="px-4 py-2 text-[11px] text-gray-700 font-medium whitespace-nowrap">${record.eventName || 'N/A'} <span class="text-gray-500">(${record.eventDate ? new Date(record.eventDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A'})</span></td>
-                        <td class="px-4 py-2 text-[11px] text-gray-600 whitespace-nowrap">${record.categoryName || 'N/A'}</td>
+                        <td class="px-4 py-2 text-[11px] text-gray-700 font-medium whitespace-nowrap">${record.eventName || 'N/A'} <span class="text-gray-500">(${record.eventDate ? new Date(record.eventDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A'}${record.gameTime ? ' ' + record.gameTime : ''})</span></td>
+                        <td class="px-4 py-2 text-[11px] text-gray-600 whitespace-nowrap">${record.gameCategory || record.categoryName || 'N/A'}</td>
+                        <td class="px-4 py-2 text-[11px] text-center whitespace-nowrap"><span class="font-bold text-gray-800">${record.qmClassification || '-'}</span>${record.qmValue ? `<span class="text-gray-500 ml-1">R$${record.qmValue}</span>` : ''}</td>
                         <td class="px-4 py-2 text-[11px] text-gray-600 whitespace-nowrap">${record.employeeName || 'N/A'}</td>
                         <td class="px-4 py-2 text-[11px] text-gray-600 whitespace-nowrap">${record.sector}</td>
                         <td class="px-4 py-2 text-[11px] text-gray-600 whitespace-nowrap">${record.managerName}</td>
@@ -1873,8 +1946,9 @@
                                         <input type="checkbox" id="select-all-records-checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-2">
                                         Data Criação
                                     </th>
-                                    <th class="px-4 py-1.5 text-[11px] font-medium text-gray-500 uppercase tracking-wider text-left">Evento (Data)</th>
-                                    <th class="px-4 py-1.5 text-[11px] font-medium text-gray-500 uppercase tracking-wider text-left">Categoria</th>
+                                    <th class="px-4 py-1.5 text-[11px] font-medium text-gray-500 uppercase tracking-wider text-left">Evento (Data/Hora)</th>
+                                    <th class="px-4 py-1.5 text-[11px] font-medium text-gray-500 uppercase tracking-wider text-left">Cat. Jogo</th>
+                                    <th class="px-4 py-1.5 text-[11px] font-medium text-gray-500 uppercase tracking-wider text-center">QM</th>
                                     <th class="px-4 py-1.5 text-[11px] font-medium text-gray-500 uppercase tracking-wider text-left">Funcionário</th>
                                     <th class="px-4 py-1.5 text-[11px] font-medium text-gray-500 uppercase tracking-wider text-left">Setor</th>
                                     <th class="px-4 py-2 text-[11px] font-medium text-gray-500 uppercase tracking-wider text-left">Gestor</th>
@@ -1912,8 +1986,8 @@
                 if (filterState.employeeId) {
                     data = data.filter(r => r.employeeId === filterState.employeeId);
                 }
-                if (filterState.categoryId) {
-                    data = data.filter(r => r.categoryId === filterState.categoryId);
+                if (filterState.gameCategory) {
+                    data = data.filter(r => r.gameCategory === filterState.gameCategory);
                 }
                 if (filterState.notes.trim()) {
                     const n = filterState.notes.trim().toLowerCase();
@@ -1957,7 +2031,7 @@
                     searchTerm: '',
                     eventName: '',
                     employeeId: '',
-                    categoryId: '',
+                    gameCategory: '',
                     notes: '',
                     sector: '',
                     managerName: '',
@@ -2013,10 +2087,10 @@
                                     </select>
                                 </div>
                                 <div class="filter-group">
-                                    <label for="filter-category" class="filter-label">Categoria:</label>
+                                    <label for="filter-category" class="filter-label">Categoria do Jogo:</label>
                                     <select id="filter-category" class="filter-input">
                                         <option value="">Todas</option>
-                                        ${globalData.categories.map(c => `<option value="${c.id}" ${filterState.categoryId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                                        ${GAME_CATEGORIES.map(c => `<option value="${c}" ${filterState.gameCategory === c ? 'selected' : ''}>${c}</option>`).join('')}
                                     </select>
                                 </div>
                                 ${userProfile.isAdmin ? `
@@ -2670,7 +2744,7 @@
             if (!records || records.length === 0) {
                 showNotification("Nenhum dado para exportar.", "info"); return;
             }
-            const headers = ["Data Criação", "Evento", "Data Evento", "Categoria", "Funcionário", "Setor", "Gestor Lançador", "Observações"];
+            const headers = ["Data Criação", "Evento", "Data Evento", "Horário", "Cat. Jogo", "QM", "Valor QM", "Funcionário", "Setor", "Gestor Lançador", "Observações"];
             let csvContent = headers.join(",") + "\\n";
 
             records.forEach(record => {
@@ -2678,7 +2752,10 @@
                     record.createdAt?.toDate?.().toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}) || 'N/A',
                     `"${(record.eventName || 'N/A').replace(/"/g, '""')}"`,
                     record.eventDate ? new Date(record.eventDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A',
-                    `"${(record.categoryName || 'N/A').replace(/"/g, '""')}"`,
+                    record.gameTime || '-',
+                    `"${(record.gameCategory || record.categoryName || 'N/A').replace(/"/g, '""')}"`,
+                    record.qmClassification || '-',
+                    record.qmValue ? `R$ ${record.qmValue}` : '-',
                     `"${(record.employeeName || 'N/A').replace(/"/g, '""')}"`,
                     `"${(record.sector || 'N/A').replace(/"/g, '""')}"`,
                     `"${(record.managerName || 'N/A').replace(/"/g, '""')}"`,
@@ -2712,7 +2789,10 @@
                 "Data Criação": record.createdAt?.toDate?.().toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}) || 'N/A',
                 "Evento": record.eventName || 'N/A',
                 "Data Evento": record.eventDate ? new Date(record.eventDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A',
-                "Categoria": record.categoryName || 'N/A',
+                "Horário": record.gameTime || '-',
+                "Cat. Jogo": record.gameCategory || record.categoryName || 'N/A',
+                "QM": record.qmClassification || '-',
+                "Valor QM": record.qmValue ? `R$ ${record.qmValue}` : '-',
                 "Funcionário": record.employeeName || 'N/A',
                 "Setor": record.sector || 'N/A',
                 "Gestor Lançador": record.managerName || 'N/A',
