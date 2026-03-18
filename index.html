@@ -985,7 +985,6 @@
                             { name: 'name', label: 'Nome do Funcionário', type: 'text' },
                             { name: 'registration', label: 'Matrícula', type: 'text' },
                             { name: 'sector', label: 'Setor', type: 'select', options: globalData.sectors.map(s => ({ value: s.name, label: s.name })) },
-                            { name: 'qmType', label: 'Tipo QM', type: 'select', options: [{ value: 'A', label: 'QM A (R$ 400/200)' }, { value: 'B', label: 'QM B (R$ 200/100)' }] }
                         ],
                         (data) => addItemToFirestore('employees', data),
                         (id, data) => updateItemInFirestore('employees', id, data),
@@ -1396,23 +1395,36 @@
                     <h2 class="text-xl font-semibold text-gray-800 mb-6 text-center">Incluir Novo Registro de Quadro Móvel</h2>
                     <form id="new-record-form" class="space-y-5">
                         <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Tipo de Evento:</label>
+                            <div class="flex gap-3">
+                                <label class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg cursor-pointer text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 has-[:checked]:text-blue-700 transition-colors">
+                                    <input type="radio" name="eventType" id="eventTypeJogo" value="jogo" checked class="accent-blue-600">
+                                    Jogo
+                                </label>
+                                <label class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg cursor-pointer text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 has-[:checked]:text-blue-700 transition-colors">
+                                    <input type="radio" name="eventType" id="eventTypeOutros" value="outros" class="accent-blue-600">
+                                    Outros Eventos
+                                </label>
+                            </div>
+                        </div>
+                        <div>
                             <label for="eventName" class="block text-xs font-medium text-gray-600 mb-1">Nome do Evento:</label>
                             <input type="text" id="eventName" required class="${inputBaseClass}" placeholder="Ex: Jogo Botafogo vs Flamengo">
                         </div>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label for="eventDate" class="block text-xs font-medium text-gray-600 mb-1">Data do Jogo:</label>
+                                <label for="eventDate" id="label-eventDate" class="block text-xs font-medium text-gray-600 mb-1">Data do Jogo:</label>
                                 <input type="date" id="eventDate" required class="${inputBaseClass}">
                             </div>
                             <div>
-                                <label for="gameTime" class="block text-xs font-medium text-gray-600 mb-1">Horário do Jogo:</label>
+                                <label for="gameTime" id="label-gameTime" class="block text-xs font-medium text-gray-600 mb-1">Horário do Jogo:</label>
                                 <select id="gameTime" required class="${inputBaseClass}">
                                     <option value="">Selecione o horário</option>
                                     ${gameTimeOptions}
                                 </select>
                             </div>
                         </div>
-                        <div>
+                        <div id="section-gameCategory">
                             <label for="gameCategory" class="block text-xs font-medium text-gray-600 mb-1">Categoria do Jogo:</label>
                             <select id="gameCategory" required class="${inputBaseClass}">
                                 <option value="">Selecione a Categoria</option>
@@ -1420,11 +1432,19 @@
                             </select>
                         </div>
                         <div>
+                            <label for="qmType" class="block text-xs font-medium text-gray-600 mb-1">Tipo QM:</label>
+                            <select id="qmType" required class="${inputBaseClass}">
+                                <option value="">Selecione o Tipo QM</option>
+                                <option value="A">QM A (R$ 400 / R$ 200)</option>
+                                <option value="B">QM B (R$ 200 / R$ 100)</option>
+                            </select>
+                        </div>
+                        <div>
                             <label for="employee" class="block text-xs font-medium text-gray-600 mb-1">Funcionário:</label>
                             <select id="employee" required class="${inputBaseClass}">${employeesOptions ? `<option value="">Selecione o Funcionário</option>${employeesOptions}` : `<option value="">Nenhum funcionário disponível para seu setor</option>`}</select>
                         </div>
                         <div>
-                            <label for="notes" class="block text-xs font-medium text-gray-600 mb-1">Observações (obrigatório se selecionar "Outros"):</label>
+                            <label for="notes" id="label-notes" class="block text-xs font-medium text-gray-600 mb-1">Observações (obrigatório se selecionar "Outros"):</label>
                             <textarea id="notes" class="${inputBaseClass} h-24" placeholder="Detalhes adicionais..."></textarea>
                         </div>
                         <div class="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 pt-4">
@@ -1441,6 +1461,21 @@
                 currentView = userProfile.isAdmin ? 'adminDashboard' : 'managerDashboard';
                 renderApp();
             });
+
+            document.querySelectorAll('input[name="eventType"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    const isOutros = this.value === 'outros';
+                    const sectionCat = document.getElementById('section-gameCategory');
+                    const gameCategory = document.getElementById('gameCategory');
+                    sectionCat.style.display = isOutros ? 'none' : '';
+                    gameCategory.required = !isOutros;
+                    if (isOutros) gameCategory.value = '';
+                    document.getElementById('label-eventDate').textContent = isOutros ? 'Data do Evento:' : 'Data do Jogo:';
+                    document.getElementById('label-gameTime').textContent = isOutros ? 'Horário do Evento:' : 'Horário do Jogo:';
+                    document.getElementById('label-notes').textContent = isOutros ? 'Observações (obrigatório):' : 'Observações (obrigatório se selecionar "Outros"):';
+                });
+            });
+
             document.getElementById('new-record-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const submitButton = e.target.querySelector('button[type="submit"]');
@@ -1448,12 +1483,21 @@
                 submitButton.disabled = true;
                 submitButton.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Salvando...</span>`;
 
+                const eventType = document.querySelector('input[name="eventType"]:checked')?.value || 'jogo';
                 const eventName = document.getElementById('eventName').value;
                 const eventDate = document.getElementById('eventDate').value;
                 const gameTime = document.getElementById('gameTime').value;
-                const gameCategory = document.getElementById('gameCategory').value;
+                const gameCategory = eventType === 'jogo' ? document.getElementById('gameCategory').value : '';
+                const qmType = document.getElementById('qmType').value;
                 const employeeId = document.getElementById('employee').value;
                 const notes = document.getElementById('notes').value;
+
+                if (eventType === 'outros' && !notes.trim()) {
+                    showNotification('Para "Outros Eventos" o campo Observações é obrigatório.', 'error');
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonContent;
+                    return;
+                }
 
                 if (employeeId === 'OUTROS' && !notes.trim()) {
                     openModal(
@@ -1469,8 +1513,15 @@
                     return;
                 }
 
-                if (!eventName || !eventDate || !gameTime || !gameCategory || !employeeId) {
-                    showNotification("Nome do Evento, Data, Horário, Categoria do Jogo e Funcionário são obrigatórios.", "error");
+                if (!eventName || !eventDate || !gameTime || !qmType || !employeeId) {
+                    showNotification("Nome do Evento, Data, Horário, Tipo QM e Funcionário são obrigatórios.", "error");
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonContent;
+                    return;
+                }
+
+                if (eventType === 'jogo' && !gameCategory) {
+                    showNotification("Categoria do Jogo é obrigatória para eventos do tipo Jogo.", "error");
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalButtonContent;
                     return;
@@ -1478,13 +1529,13 @@
 
                 const employee = employeeId === 'OUTROS' ? null : globalData.employees.find(emp => emp.id === employeeId);
                 const employeeName = employeeId === 'OUTROS' ? notes.trim() : employee?.name;
-                const qmType = employee?.qmType || 'B';
                 const qmResult = computeQMClassification(qmType, eventDate, gameTime);
 
                 const newRecordData = {
                     eventName,
                     eventDate,
                     gameTime,
+                    eventType,
                     gameCategory,
                     qmClassification: qmResult.classification,
                     qmValue: qmResult.value,
@@ -1554,7 +1605,7 @@
                 return;
             }
 
-            const headers = ["Nome do Evento", "Data do Evento", "Horário do Jogo", "Categoria do Jogo", "Funcionário", "Observações"];
+            const headers = ["Nome do Evento", "Data do Evento", "Horário do Jogo", "Categoria do Jogo", "Tipo QM", "Funcionário", "Observações"];
             const mainSheetName = "Registros";
             const listsSheetName = "Listas"; // Name for the lists sheet
 
@@ -1570,10 +1621,11 @@
             const ws = XLSX.utils.aoa_to_sheet([headers]);
 
             // Create lists sheet with employees, game times and game categories
-            const maxRows = Math.max(employeesForLists.length, GAME_TIMES.length, GAME_CATEGORIES.length);
-            const listsData = [["Funcionários", "Horários", "Categorias do Jogo"]];
+            const qmTypes = ['A', 'B'];
+            const maxRows = Math.max(employeesForLists.length, GAME_TIMES.length, GAME_CATEGORIES.length, qmTypes.length);
+            const listsData = [["Funcionários", "Horários", "Categorias do Jogo", "Tipo QM"]];
             for (let i = 0; i < maxRows; i++) {
-                listsData.push([employeesForLists[i] || '', GAME_TIMES[i] || '', GAME_CATEGORIES[i] || '']);
+                listsData.push([employeesForLists[i] || '', GAME_TIMES[i] || '', GAME_CATEGORIES[i] || '', qmTypes[i] || '']);
             }
             const wsLists = XLSX.utils.aoa_to_sheet(listsData);
 
@@ -1765,7 +1817,8 @@
                                 finalEmployeeName = foundEmployee.name;
                             }
 
-                            const qmType = foundEmployee?.qmType || 'B';
+                            const qmTypeRaw = (record["Tipo QM"] || '').trim().toUpperCase();
+                            const qmType = qmTypeRaw === 'A' ? 'A' : 'B';
                             const qmResult = computeQMClassification(qmType, eventDate, gameTime);
 
                             const dataToSave = {
