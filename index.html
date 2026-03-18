@@ -2634,11 +2634,20 @@
                     }
                 }
 
+                const isManagerChecked = document.getElementById('userProfileIsManager').checked;
+                const sectorValue = document.getElementById('userProfileSector').value;
+                if (isManagerChecked && (!sectorValue || sectorValue.trim() === '')) {
+                    showNotification('Um gestor deve ter um setor definido.', 'error');
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonText;
+                    return;
+                }
+
                 const profileData = {
                     name: document.getElementById('userProfileName').value,
                     email: email,
-                    sector: document.getElementById('userProfileSector').value,
-                    isManager: document.getElementById('userProfileIsManager').checked,
+                    sector: sectorValue,
+                    isManager: isManagerChecked,
                     isAdmin: document.getElementById('userProfileIsAdmin').checked,
                     uid: uid
                 };
