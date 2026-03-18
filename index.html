@@ -1196,15 +1196,22 @@
                 submitButton.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Criando administrador...</span>`;
 
                 try {
-                    // Cria o usuário no Firebase Auth via app secundária (sem deslogar ninguém)
+                    // Passo 1: Cria o usuário no Firebase Auth via app secundária
                     const uid = await createAuthUser(email, password);
 
-                    // Faz login com as credenciais recém criadas para poder escrever no Firestore
-                    await signInWithEmailAndPassword(auth, email, password);
+                    // Passo 2: Abre uma SEGUNDA instância temporária para escrever o perfil
+                    // ANTES de fazer login na instância principal (evita race condition com onAuthStateChanged)
+                    const tempWriteApp = initializeApp(firebaseConfig, 'temp-write-' + Date.now());
+                    const tempWriteAuth = getAuth(tempWriteApp);
+                    const tempWriteDb = getFirestore(tempWriteApp);
 
-                    // Cria o perfil admin no Firestore (autenticado como o novo usuário)
-                    const userDocRef = doc(getCollectionRef('users_profile', false), uid);
-                    await setDoc(userDocRef, {
+                    await signInWithEmailAndPassword(tempWriteAuth, email, password);
+
+                    const adminProfileRef = doc(
+                        collection(tempWriteDb, 'artifacts', currentAppId, 'users_profile'),
+                        uid
+                    );
+                    await setDoc(adminProfileRef, {
                         name,
                         email,
                         sector: '',
@@ -1214,8 +1221,13 @@
                         createdAt: Timestamp.now()
                     });
 
+                    await signOut(tempWriteAuth);
+                    await deleteApp(tempWriteApp);
+
+                    // Passo 3: Agora faz login na instância principal — perfil já existe no Firestore
+                    await signInWithEmailAndPassword(auth, email, password);
                     showNotification('Administrador criado com sucesso! Bem-vindo ao sistema.', 'success');
-                    // onAuthStateChanged cuidará da navegação para o painel admin
+                    // onAuthStateChanged encontrará o perfil e navegará para o painel admin
                 } catch (error) {
                     console.error('[renderSetupPage] Erro ao criar admin:', error);
                     const msg = error.code === 'auth/email-already-in-use'
