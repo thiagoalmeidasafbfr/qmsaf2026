@@ -215,11 +215,9 @@
 
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfigFromUser;
 
-        // currentAppId deve ser baseado no projectId do firebaseConfig para consistência com as regras de segurança e caminhos.
-        const currentAppId = firebaseConfig.projectId || 'default-app-id';
-        if (typeof __app_id !== 'undefined' && __app_id !== firebaseConfig.projectId) {
-            console.warn(`Variável __app_id ('${__app_id}') detectada e diferente do projectId ('${firebaseConfig.projectId}'). Usando firebaseConfig.projectId para caminhos do Firestore para consistência com a configuração manual de dados que utiliza o projectId.`);
-        }
+        // currentAppId define o caminho dos dados no Firestore (artifacts/{currentAppId}/...).
+        // Os dados foram importados do projeto anterior (qmsafbotafogo), então o caminho permanece o mesmo.
+        const currentAppId = 'qmsafbotafogo';
 
 
         const app = initializeApp(firebaseConfig);
@@ -564,12 +562,11 @@
                 if (document.getElementById('app-content')) {
                     // Call applyFilters to ensure the displayed records match the current filter state
                     // This is crucial because globalData.records has just been updated
-                    if (currentView === 'history') { // Only apply filters if we are on the history page
+                    if (currentView === 'history') {
                         applyFilters();
-                    } else if (currentView === 'importRecords' || currentView === 'changePassword') {
-                        renderApp(); // Rerender for these pages if data changes
+                    } else {
+                        renderApp();
                     }
-                    // For adminManage views, they already explicitly call renderApp when their specific data changes
                 }
             }, (error) => {
                 console.error(`[fetchDataWithListener] Erro ao carregar ${collectionName} (dataKey: ${dataKey}). Path: ${collRef.path}. Query Constraints:`, qConstraints, "Objeto do Erro Firebase:", error);
@@ -1196,15 +1193,22 @@
                 submitButton.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Criando administrador...</span>`;
 
                 try {
-                    // Cria o usuário no Firebase Auth via app secundária (sem deslogar ninguém)
+                    // Passo 1: Cria o usuário no Firebase Auth via app secundária
                     const uid = await createAuthUser(email, password);
 
-                    // Faz login com as credenciais recém criadas para poder escrever no Firestore
-                    await signInWithEmailAndPassword(auth, email, password);
+                    // Passo 2: Abre uma SEGUNDA instância temporária para escrever o perfil
+                    // ANTES de fazer login na instância principal (evita race condition com onAuthStateChanged)
+                    const tempWriteApp = initializeApp(firebaseConfig, 'temp-write-' + Date.now());
+                    const tempWriteAuth = getAuth(tempWriteApp);
+                    const tempWriteDb = getFirestore(tempWriteApp);
 
-                    // Cria o perfil admin no Firestore (autenticado como o novo usuário)
-                    const userDocRef = doc(getCollectionRef('users_profile', false), uid);
-                    await setDoc(userDocRef, {
+                    await signInWithEmailAndPassword(tempWriteAuth, email, password);
+
+                    const adminProfileRef = doc(
+                        collection(tempWriteDb, 'artifacts', currentAppId, 'users_profile'),
+                        uid
+                    );
+                    await setDoc(adminProfileRef, {
                         name,
                         email,
                         sector: '',
@@ -1214,8 +1218,13 @@
                         createdAt: Timestamp.now()
                     });
 
+                    await signOut(tempWriteAuth);
+                    await deleteApp(tempWriteApp);
+
+                    // Passo 3: Agora faz login na instância principal — perfil já existe no Firestore
+                    await signInWithEmailAndPassword(auth, email, password);
                     showNotification('Administrador criado com sucesso! Bem-vindo ao sistema.', 'success');
-                    // onAuthStateChanged cuidará da navegação para o painel admin
+                    // onAuthStateChanged encontrará o perfil e navegará para o painel admin
                 } catch (error) {
                     console.error('[renderSetupPage] Erro ao criar admin:', error);
                     const msg = error.code === 'auth/email-already-in-use'
