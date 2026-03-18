@@ -1,0 +1,2563 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Quadro Móvel - Botafogo</title>
+    <!-- Sugestão de Segurança: Considere implementar uma Content Security Policy (CSP)
+         no seu servidor web para mitigar ataques de Cross-Site Scripting (XSS) e injeção de dados.
+         Exemplo (inclua no cabeçalho HTTP do servidor ou como meta tag se souber o impacto):
+         <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://placehold.co; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com; style-src-elem 'self' https://fonts.googleapis.com 'unsafe-inline';">
+         A configuração acima é um exemplo e deve ser adaptada cuidadosamente ao seu ambiente.
+    -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Biblioteca SheetJS para exportação/importação de XLSX -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background-color: #f8f9fa;
+        }
+        .font_inter {
+            font-family: 'Inter', sans-serif;
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e9ecef;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #adb5bd;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6c757d;
+        }
+        .loader {
+            border: 3px solid #dee2e6;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 0.8s linear infinite;
+        }
+        .loader_small_blue {
+            border: 2px solid #cce5ff;
+            border-top: 2px solid #ffffff;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        select, input[type="text"], input[type="email"], input[type="password"], input[type="date"], textarea {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: none;
+        }
+        select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236c757d'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd' /%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1.25em 1.25em;
+            padding-right: 2.5rem;
+        }
+        textarea {
+            resize: vertical;
+        }
+        .filter-wrapper {
+            background: #fafafa;
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            padding: 0.25rem 0.5rem;
+        }
+        .filter-label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.125rem;
+        }
+        .filter-input {
+            width: 100%;
+            padding: 0.25rem 0.5rem;
+            border: 1px solid #9ca3af;
+            border-radius: 0.375rem;
+            background: #f9fafb;
+            color: #374151;
+            font-size: 0.75rem;
+        }
+        .filter-input:focus {
+            outline: none;
+            border-color: #6b7280;
+            box-shadow: 0 0 0 2px #d1d5db;
+        }
+        .filter-toggle summary {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #e5e7eb;
+            padding: 0.375rem 0.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #374151;
+        }
+        .filter-toggle summary::-webkit-details-marker {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div id="app-container" class="min-h-screen font_inter flex flex-col">
+        <header id="app-header" class="bg-white shadow-sm border-b border-gray-200 p-4 hidden sticky top-0 z-40">
+            <div class="container mx-auto flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <img src="favicon.png" alt="Logo Botafogo" class="h-8 w-8 rounded-md">
+                    <h1 class="text-xl font-semibold text-gray-800">
+                        Portal <span class="text-blue-600">Quadro Móvel</span>
+                    </h1>
+                </div>
+                <div id="user-info-header" class="flex items-center space-x-4">
+                </div>
+            </div>
+        </header>
+
+        <main id="app-content" class="container mx-auto p-4 md:p-6 lg:p-8 flex-grow">
+            <div id="initial-loading" class="flex flex-col items-center justify-center h-full p-8">
+                <div class="loader mb-3"></div>
+                <p class="text-gray-600">Inicializando aplicação...</p>
+            </div>
+        </main>
+
+        <footer id="app-footer" class="text-center p-5 border-t border-gray-200 text-gray-500 text-xs hidden">
+            </footer>
+
+        <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4 hidden animate-fadeIn">
+            <div id="modal-content" class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-lg transform transition-all">
+                </div>
+        </div>
+
+        <div id="notification-container" class="fixed top-6 right-6 z-[100] space-y-3 w-full max-w-sm sm:max-w-md">
+            </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import {
+            getAuth,
+            signInWithEmailAndPassword,
+            signOut,
+            onAuthStateChanged,
+            signInAnonymously,
+            signInWithCustomToken,
+            sendPasswordResetEmail,
+            reauthenticateWithCredential, // Importar para reautenticação
+            EmailAuthProvider,          // Importar para criar credencial
+            updatePassword,             // Importar para atualizar a senha
+            createUserWithEmailAndPassword
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import {
+            getFirestore,
+            doc,
+            getDoc,
+            setDoc,
+            addDoc,
+            collection,
+            query,
+            where,
+            getDocs,
+            Timestamp,
+            deleteDoc,
+            updateDoc,
+            onSnapshot
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Configuração do Firebase, usando a variável global se disponível, caso contrário, a configuração padrão.
+        // A chave de API do Firebase é pública e projetada para ser incluída no código do cliente.
+        // As regras de segurança do Firestore (configuradas separadamente) são responsáveis por proteger seus dados.
+        const firebaseConfigFromUser = {
+            apiKey: "AIzaSyDkRi6GWPiVawTe607frndhUbfB77yfVOw",
+            authDomain: "qmsafbotafogo.firebaseapp.com",
+            databaseURL: "https://qmsafbotafogo-default-rtdb.firebaseio.com",
+            projectId: "qmsafbotafogo",
+            storageBucket: "qmsafbotafogo.firebasestorage.app",
+            messagingSenderId: "447753167474",
+            appId: "1:447753167474:web:7706e7a5c78b4127a058eb"
+        };
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfigFromUser;
+
+        // currentAppId deve ser baseado no projectId do firebaseConfig para consistência com as regras de segurança e caminhos.
+        const currentAppId = firebaseConfig.projectId || 'default-app-id';
+        if (typeof __app_id !== 'undefined' && __app_id !== firebaseConfig.projectId) {
+            console.warn(`Variável __app_id ('${__app_id}') detectada e diferente do projectId ('${firebaseConfig.projectId}'). Usando firebaseConfig.projectId para caminhos do Firestore para consistência com a configuração manual de dados que utiliza o projectId.`);
+        }
+
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const appHeader = document.getElementById('app-header');
+        const appContent = document.getElementById('app-content');
+        const appFooter = document.getElementById('app-footer');
+        const userInfoHeader = document.getElementById('user-info-header');
+        const initialLoadingDiv = document.getElementById('initial-loading');
+        const modalContainer = document.getElementById('modal-container');
+        const modalContent = document.getElementById('modal-content');
+        const notificationContainer = document.getElementById('notification-container');
+        const deleteUserEndpoint = typeof __delete_user_url !== 'undefined' ? __delete_user_url : null;
+
+        let currentUser = null;
+        let userProfile = null;
+        let currentView = 'login';
+        let globalData = {
+            categories: [], sectors: [], employees: [], rules: [], records: [], allUsers: []
+        };
+        let unsubscribers = [];
+        let currentFilteredRecordsForExport = [];
+        let selectedRecordIds = new Set(); // Global set to store selected record IDs for bulk deletion
+        // Placeholder; actual implementation set when history view is rendered
+        let updateSelectedCountUI = () => {};
+
+        // Global filter state object
+        let filterState = {
+            searchTerm: '',
+            eventName: '',
+            employeeId: '',
+            categoryId: '',
+            notes: '',
+            sector: '', // Only for admin
+            managerName: '', // Only for admin
+            eventDateStart: '',
+            eventDateEnd: '',
+            creationDateStart: '',
+            creationDateEnd: ''
+        };
+
+        // Mapping from filter input IDs to filterState keys for consistent updates
+        const filterIdToStateKey = {
+            'filter-search': 'searchTerm',
+            'filter-event-name': 'eventName',
+            'filter-employee': 'employeeId',
+            'filter-category': 'categoryId',
+            'filter-notes': 'notes',
+            'filter-sector': 'sector',
+            'filter-manager': 'managerName',
+            'filter-event-date-start': 'eventDateStart',
+            'filter-event-date-end': 'eventDateEnd',
+            'filter-creation-date-start': 'creationDateStart',
+            'filter-creation-date-end': 'creationDateEnd'
+        };
+
+        // Filtros para a página de Funcionários
+        let employeeFilterState = {
+            searchTerm: '',
+            sector: ''
+        };
+
+        const employeeFilterIdToStateKey = {
+            'emp-filter-search': 'searchTerm',
+            'emp-filter-sector': 'sector'
+        };
+
+
+        const showElement = (el) => el.classList.remove('hidden');
+        const hideElement = (el) => el.classList.add('hidden');
+
+        // Função para exibir notificações na tela
+        function showNotification(message, type = 'info', duration = 4000) {
+            const id = `notif-${Date.now()}`;
+            let bgColor, textColor, iconColor, iconSvg;
+
+            switch (type) {
+                case 'error':
+                    bgColor = 'bg-red-50'; textColor = 'text-red-700'; iconColor = 'text-red-500';
+                    iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12zm-1-5a1 1 0 102 0v-2a1 1 0 10-2 0v2zm0 3a1 1 0 102 0 1 1 0 10-2 0z" clip-rule="evenodd" /></svg>`;
+                    break;
+                case 'success':
+                    bgColor = 'bg-green-50'; textColor = 'text-green-700'; iconColor = 'text-green-500';
+                    iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-.707-4.293a1 1 0 00-1.414-1.414l-2-2a1 1 0 00-1.414 1.414L6.586 13H5a1 1 0 000 2h1.586l1.707 1.707a1 1 0 001.414-1.414l-2-2 1.293-1.293zM14.5 11a1 1 0 01-1-1V7a1 1 0 112 0v3a1 1 0 01-1 1z" clip-rule="evenodd" /></svg>`;
+                    break;
+                default: // info
+                    bgColor = 'bg-blue-50'; textColor = 'text-blue-700'; iconColor = 'text-blue-500';
+                    iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12zm-1-5a1 1 0 102 0V8a1 1 0 10-2 0v3zm0 3a1 1 0 102 0 1 1 0 10-2 0z" clip-rule='evenodd' /></svg>`;
+            }
+
+            const notificationDiv = document.createElement('div');
+            notificationDiv.id = id;
+            notificationDiv.className = `animate-fadeIn p-4 rounded-lg shadow-lg ${bgColor} ${textColor} flex items-start space-x-3 border border-${type === 'error' ? 'red' : type === 'success' ? 'green' : 'blue'}-200`;
+            notificationDiv.innerHTML = `
+                <div class="${iconColor} mt-0.5">${iconSvg}</div>
+                <div class="flex-1">
+                    <p class="font-medium">${type.charAt(0).toUpperCase() + type.slice(1)}</p>
+                    <p class="text-sm">${message}</p>
+                </div>
+                <button class="text-gray-400 hover:text-gray-600" onclick="document.getElementById('${id}').remove()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
+                </button>
+            `;
+            notificationContainer.appendChild(notificationDiv);
+
+            setTimeout(() => {
+                const el = document.getElementById(id);
+                if (el) el.remove();
+            }, duration);
+        }
+
+        // Função para abrir modais customizados
+        function openModal(title, contentHtml, onConfirmAsync = null, confirmText = 'Confirmar', onCancel = null, cancelText = 'Cancelar') {
+            modalContent.innerHTML = `
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-xl font-semibold text-gray-800">${title}</h3>
+                    <button id="modal-close-btn" class="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+                <div class="text-gray-600 text-sm">${contentHtml}</div>
+                <div id="modal-actions" class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+                    ${onCancel ? `<button id="modal-cancel-btn" class="px-4 py-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300">${cancelText}</button>` : ''}
+                    ${onConfirmAsync ? `<button id="modal-confirm-btn" class="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 min-w-[120px] text-center">${confirmText}</button>` : ''}
+                </div>
+            `;
+            showElement(modalContainer);
+            document.getElementById('modal-close-btn').onclick = closeModal;
+
+            const cancelBtn = document.getElementById('modal-cancel-btn');
+            if (cancelBtn && typeof onCancel === 'function') {
+                cancelBtn.onclick = () => { closeModal(); onCancel(); };
+            }
+
+            const confirmBtn = document.getElementById('modal-confirm-btn');
+            if (confirmBtn && typeof onConfirmAsync === 'function') {
+                confirmBtn.onclick = async () => {
+                    const originalButtonText = confirmBtn.innerHTML;
+                    const cancelButton = document.getElementById('modal-cancel-btn');
+
+                    confirmBtn.disabled = true;
+                    if(cancelButton) cancelButton.disabled = true;
+                    confirmBtn.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Processando...</span>`;
+
+                    try {
+                        await onConfirmAsync();
+                    } catch (e) {
+                        console.error("Error during modal confirm operation (caught in openModal):", e);
+                    } finally {
+                        // Fecha o modal independentemente do sucesso ou falha da operação
+                        closeModal();
+                    }
+                };
+            }
+        }
+
+        // Função para fechar modais
+        function closeModal() {
+            hideElement(modalContainer);
+            modalContent.innerHTML = '';
+        }
+
+        // Função de confirmação genérica
+        function confirmAction(title, message, onConfirmAsync) {
+            openModal(title, `<p>${message}</p>`, onConfirmAsync, 'Confirmar', () => {}, 'Cancelar');
+        }
+
+        // Cria um usuário no Firebase Auth usando uma instância secundária
+        async function createAuthUser(email, password) {
+            const tempApp = initializeApp(firebaseConfig, 'temp-' + Date.now());
+            const tempAuth = getAuth(tempApp);
+            const cred = await createUserWithEmailAndPassword(tempAuth, email, password);
+            await signOut(tempAuth);
+            await deleteApp(tempApp);
+            return cred.user.uid;
+        }
+
+        // Listener de autenticação do Firebase
+        onAuthStateChanged(auth, async (firebaseUser) => {
+            hideElement(initialLoadingDiv);
+            currentUser = firebaseUser;
+            if (firebaseUser) {
+                try {
+                    console.log(`[onAuthStateChanged] Tentando buscar perfil. UID: ${firebaseUser.uid}, currentAppId: ${currentAppId}`);
+                    const userDocRef = doc(db, 'artifacts', currentAppId, 'users_profile', firebaseUser.uid);
+                    const userDocSnap = await getDoc(userDocRef);
+                    if (userDocSnap.exists()) {
+                        userProfile = { id: userDocSnap.id, ...userDocSnap.data() };
+                        console.log("[onAuthStateChanged] Perfil do usuário encontrado:", userProfile);
+                        updateHeaderUI();
+                        showElement(appHeader);
+                        showElement(appFooter);
+                        if (userProfile.isAdmin) currentView = 'adminDashboard';
+                        else if (userProfile.isManager) currentView = 'managerDashboard';
+                        else {
+                            showNotification("Usuário não possui perfil de gestor ou admin.", "error");
+                            currentView = 'login';
+                            await handleLogout();
+                        }
+                        loadAllData();
+                    } else {
+                        showNotification("Perfil do usuário não encontrado. Contacte o administrador.", "error");
+                        console.warn(`[onAuthStateChanged] Perfil não encontrado para UID: ${firebaseUser.uid} no caminho artifacts/${currentAppId}/users_profile/`);
+                        await handleLogout();
+                    }
+                } catch (error) {
+                    console.error("[onAuthStateChanged] Erro ao buscar perfil:", error);
+                    showNotification("Erro ao carregar perfil. Tente novamente.", "error");
+                    await handleLogout();
+                }
+            } else {
+                userProfile = null;
+                hideElement(appHeader);
+                hideElement(appFooter);
+                currentView = 'login';
+                clearAllDataAndUnsubscribe();
+            }
+            renderApp();
+        });
+
+        // Função para realizar o sign-in inicial com token customizado (do ambiente Canvas) ou anonimamente
+        async function performInitialSignIn() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    console.log("Nenhum token de autenticação inicial. Aguardando login do usuário.");
+                }
+            } catch (error) {
+                console.error("Erro no signInWithCustomToken:", error);
+                showNotification("Falha na autenticação inicial.", "error");
+            }
+        }
+
+        // Função para lidar com o login de email/senha
+        async function handleLogin(email, password) {
+            appContent.innerHTML = `<div class="flex flex-col justify-center items-center h-64"><div class="loader"></div><p class="ml-3 text-gray-600 mt-3">Entrando...</p></div>`;
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                showNotification("Login bem-sucedido!", "success");
+            } catch (error) {
+                console.error("Erro no login:", error);
+                showNotification(error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential'
+                    ? "Email ou senha inválidos."
+                    : `Erro ao fazer login: ${error.message} (código: ${error.code})`, "error");
+                renderApp();
+            }
+        }
+
+        // Função para lidar com o logout
+        async function handleLogout() {
+            try {
+                await signOut(auth);
+                showNotification("Logout realizado com sucesso!", "success");
+            } catch (error) {
+                console.error("Erro no logout:", error);
+                showNotification("Erro ao fazer logout.", "error");
+            }
+        }
+
+        // Atualiza a UI do cabeçalho com informações do usuário
+        function updateHeaderUI() {
+            if (userProfile) {
+                userInfoHeader.innerHTML = `
+                    <button id="btn-change-password" class="text-sm font-medium text-gray-600 hover:text-gray-700 py-2 px-3 rounded-lg hover:bg-gray-100 transition-colors duration-150 flex items-center space-x-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        <span>Redefinir Senha</span>
+                    </button>
+                    <span class="text-sm text-gray-600 hidden sm:block">
+                        Olá, <span class="font-medium text-gray-800">${userProfile.name}</span>
+                        <span class="text-gray-400">(${userProfile.isAdmin ? 'Admin' : userProfile.isManager ? `Gestor - ${userProfile.sector}` : 'Usuário'})</span>
+                    </span>
+                    <button id="logout-btn" class="text-sm font-medium text-blue-600 hover:text-blue-700 py-2 px-3 rounded-lg hover:bg-blue-50 transition-colors duration-150 flex items-center space-x-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                        <span>Sair</span>
+                    </button>
+                `;
+                document.getElementById('logout-btn').addEventListener('click', handleLogout);
+                document.getElementById('btn-change-password').addEventListener('click', () => {
+                    currentView = 'changePassword';
+                    renderApp();
+                });
+                appFooter.innerHTML = `© ${new Date().getFullYear()} SAF Botafogo. Todos os direitos reservados. <span class="text-gray-400">UID: ${currentUser?.uid}</span>`;
+            } else {
+                userInfoHeader.innerHTML = '';
+            }
+        }
+
+        // Retorna a referência da coleção baseada se é pública ou não
+        function getCollectionRef(collectionName, isPublic = true) {
+            if (isPublic) {
+                return collection(db, 'artifacts', currentAppId, 'public', 'data', collectionName);
+            }
+            // Para coleções privadas ou específicas do app (como 'records' ou 'users_profile')
+            return collection(db, 'artifacts', currentAppId, collectionName);
+        }
+
+        // Função para buscar dados do Firestore com listener em tempo real
+        async function fetchDataWithListener(collectionName, dataKey, queryConstraints = [], isPublic = true, targetCollectionRef = null) {
+            if (!userProfile) return;
+
+            const collRef = targetCollectionRef || getCollectionRef(collectionName, isPublic);
+            let qConstraints = [...queryConstraints];
+
+            // Filtra records e employees pelo setor do gestor, se não for admin
+            if (dataKey === 'records' && userProfile.isManager && !userProfile.isAdmin) {
+                qConstraints.push(where("sector", "==", userProfile.sector));
+                qConstraints.push(where("managerId", "==", currentUser.uid)); // Adicionando filtro por managerId para gestores
+            }
+            if (dataKey === 'employees' && userProfile.isManager && !userProfile.isAdmin) {
+                qConstraints.push(where("sector", "==", userProfile.sector));
+            }
+
+            let q = query(collRef, ...qConstraints);
+
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                if (dataKey === 'records') {
+                    // Ordena registros pela data de criação em ordem decrescente
+                    items.sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
+                }
+                globalData[dataKey] = items;
+                // Clear selected IDs for any records that might have been deleted,
+                // or if the data itself changed significantly after the snapshot.
+                selectedRecordIds.forEach(id => {
+                    if (!items.some(item => item.id === id)) {
+                        selectedRecordIds.delete(id);
+                    }
+                });
+                updateSelectedCountUI(); // Update UI after globalData is updated and selections potentially adjusted.
+
+                // Re-render only if the current view depends on this specific data
+                if (document.getElementById('app-content')) {
+                    // Call applyFilters to ensure the displayed records match the current filter state
+                    // This is crucial because globalData.records has just been updated
+                    if (currentView === 'history') { // Only apply filters if we are on the history page
+                        applyFilters();
+                    } else if (currentView === 'importRecords' || currentView === 'changePassword') {
+                        renderApp(); // Rerender for these pages if data changes
+                    }
+                    // For adminManage views, they already explicitly call renderApp when their specific data changes
+                }
+            }, (error) => {
+                console.error(`[fetchDataWithListener] Erro ao carregar ${collectionName} (dataKey: ${dataKey}). Path: ${collRef.path}. Query Constraints:`, qConstraints, "Objeto do Erro Firebase:", error);
+                showNotification(`Falha ao carregar ${collectionDisplayName(collectionName).plural}. Verifique suas permissões ou tente novamente.`, "error", 5000);
+                // NOT calling loadAllData() here to avoid potential loops if security rules are the issue.
+            });
+            unsubscribers.push(unsubscribe);
+        }
+
+        // Carrega todos os dados iniciais
+        function loadAllData() {
+            clearAllDataAndUnsubscribe();
+            if (userProfile) {
+                fetchDataWithListener('categories', 'categories');
+                fetchDataWithListener('sectors', 'sectors');
+                fetchDataWithListener('employees', 'employees');
+                fetchDataWithListener('rules', 'rules');
+                // Registros não são públicos, então o isPublic é false e a coleção é direta.
+                fetchDataWithListener('records', 'records', [], false, getCollectionRef('records', false));
+
+                // Apenas administradores buscam todos os perfis de usuários
+                if (userProfile.isAdmin) {
+                    fetchDataWithListener('users_profile', 'allUsers', [], false, getCollectionRef('users_profile', false));
+                }
+            }
+        }
+
+        // Limpa os dados globais e cancela todos os listeners do Firestore
+        function clearAllDataAndUnsubscribe() {
+            unsubscribers.forEach(unsub => unsub());
+            unsubscribers = [];
+            globalData = { categories: [], sectors: [], employees: [], rules: [], records: [], allUsers: [] };
+            selectedRecordIds.clear(); // Clear selections when data is reset
+        }
+
+        // --- Utilidades de Datas ---
+        function addBusinessDays(date, days) {
+            const result = new Date(date);
+            let added = 0;
+            while (added < days) {
+                result.setDate(result.getDate() + 1);
+                const d = result.getDay();
+                if (d !== 0 && d !== 6) added++;
+            }
+            return result;
+        }
+
+        function addCalendarDays(date, days) {
+            const result = new Date(date);
+            result.setDate(result.getDate() + days);
+            return result;
+        }
+
+        function addDaysConsideringWorking(date, days, working) {
+            return working ? addBusinessDays(date, days) : addCalendarDays(date, days);
+        }
+
+        function validateRecordWithRules(recordData, sectorName) {
+            for (const rule of globalData.rules) {
+                if (rule.sector && rule.sector !== '*' && rule.sector.toLowerCase() !== sectorName) {
+                    continue;
+                }
+                if (rule.field === 'eventDate') {
+                    const eventDateObj = new Date(recordData.eventDate + 'T00:00:00');
+                    const dow = eventDateObj.getDay();
+                    if (rule.type === 'notWeekend' && (dow === 0 || dow === 6)) {
+                        const msg = rule.message || rule.description || 'Data do evento não permitida.';
+                        showNotification(msg, 'error');
+                        return msg;
+                    }
+                    if (rule.type === 'weekendOnly' && (dow !== 0 && dow !== 6)) {
+                        const msg = rule.message || rule.description || 'Data do evento não permitida.';
+                        showNotification(msg, 'error');
+                        return msg;
+                    }
+                    if (rule.type === 'min3DaysAhead') {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const minDate = new Date(today);
+                        minDate.setDate(minDate.getDate() + 3);
+                        if (eventDateObj < minDate) {
+                            const msg = rule.message || rule.description || 'Data do evento deve ser pelo menos 3 dias após a inclusão.';
+                            showNotification(msg, 'error');
+                            return msg;
+                        }
+                    }
+                    if (rule.type === 'maxDaysAhead') {
+                        const days = parseInt(rule.limitDays || '0', 10);
+                        const working = String(rule.workingDays) === 'true';
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const maxDate = addDaysConsideringWorking(today, days, working);
+                        if (eventDateObj > maxDate) {
+                            const msg = rule.message || rule.description || `Data do evento deve ser até ${days} dia(s)${working ? ' útil(eis)' : ''} após a inclusão.`;
+                            showNotification(msg, 'error');
+                            return msg;
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        // Adiciona um registro de quadro móvel ao Firestore
+        async function addRecordToFirestore(recordData) {
+            if (!userProfile) {
+                showNotification("Perfil do usuário não carregado. Não é possível salvar o registro.", "error");
+                return Promise.reject(new Error("Perfil não carregado"));
+            }
+            if (!userProfile.isManager) {
+                showNotification("Apenas gestores podem adicionar registros.", "error");
+                return Promise.reject(new Error("Acesso negado, não é gestor"));
+            }
+            if (!userProfile.sector || userProfile.sector.trim() === "") {
+                showNotification("Setor do gestor não definido no perfil. Não é possível salvar o registro. Contacte o administrador.", "error");
+                console.error("[addRecordToFirestore] Tentativa de salvar registro, mas userProfile.sector é indefinido ou vazio:", userProfile);
+                return Promise.reject(new Error("Setor do gestor não definido"));
+            }
+
+            const sectorName = (userProfile.sector || '').toLowerCase();
+
+            const ruleError = validateRecordWithRules(recordData, sectorName);
+            if (ruleError) {
+                return { success: false, error: ruleError };
+            }
+
+            if (sectorName === 'scout (base)') {
+                const eventDateObj = new Date(recordData.eventDate + 'T00:00:00');
+
+                const dailyExists = globalData.records.some(r =>
+                    r.employeeId === recordData.employeeId &&
+                    r.eventDate === recordData.eventDate &&
+                    r.sector?.toLowerCase() === sectorName
+                );
+                if (dailyExists) {
+                    showNotification("No Scout (base) cada funcionário só pode registrar um QM por dia.", "error");
+                    return { success: false, error: "Limite diário" };
+                }
+
+                const monthKey = `${eventDateObj.getFullYear()}-${String(eventDateObj.getMonth()+1).padStart(2,'0')}`;
+                const monthlyCount = globalData.records.filter(r =>
+                    r.employeeId === recordData.employeeId &&
+                    r.sector?.toLowerCase() === sectorName &&
+                    r.eventDate && r.eventDate.startsWith(monthKey)
+                ).length;
+                if (monthlyCount >= 8) {
+                    showNotification("Limite de 8 QMs mensais por funcionário atingido para este setor.", "error");
+                    return { success: false, error: "Limite mensal" };
+                }
+            }
+
+            try {
+                const recordsCollectionRef = getCollectionRef('records', false); // Registros não são públicos
+                const dataToSave = {
+                    ...recordData,
+                    managerId: currentUser.uid,
+                    managerName: userProfile.name,
+                    sector: userProfile.sector,
+                    createdAt: Timestamp.now()
+                };
+                console.log("[addRecordToFirestore] Dados para salvar:", dataToSave);
+                await addDoc(recordsCollectionRef, dataToSave);
+                // showNotification("Registro adicionado com sucesso!", "success"); // Notificação movida para handleFileUpload
+                // currentView = userProfile.isAdmin ? 'adminDashboard' : 'managerDashboard'; // Renderização movida para handleFileUpload
+                // renderApp(); // Renderização movida para handleFileUpload
+                return { success: true };
+            } catch (error) {
+                console.error("[addRecordToFirestore] Erro ao adicionar registro:", error);
+                // showNotification("Falha ao adicionar registro. Verifique o console para detalhes.", "error"); // Notificação movida para handleFileUpload
+                return { success: false, error: error.message };
+            }
+        }
+
+        // Adiciona um novo item (categoria, setor, funcionário) ao Firestore
+        async function addItemToFirestore(collectionNameKey, data, isPublic = true) {
+            if (!userProfile) {
+                showNotification("Perfil de usuário não carregado. Tente recarregar a página.", "error");
+                return Promise.reject(new Error("Perfil não carregado"));
+            }
+            if (!userProfile.isAdmin) {
+                showNotification("Acesso negado. Apenas administradores podem adicionar itens.", "error");
+                return Promise.reject(new Error("Acesso negado"));
+            }
+            if (!currentUser || !currentUser.uid) {
+                showNotification("Informação do usuário atual (UID) não disponível.", "error");
+                return Promise.reject(new Error("UID do usuário não disponível"));
+            }
+
+            const dataToWrite = { ...data, createdAt: Timestamp.now(), createdBy: currentUser.uid };
+
+            console.log(`[addItemToFirestore] Tentando adicionar em '${collectionNameKey}'.`);
+            console.log(`[addItemToFirestore] Path: artifacts/${currentAppId}/${isPublic ? 'public/data/' : ''}${collectionNameKey}`);
+            console.log("[addItemToFirestore] Dados para escrever:", JSON.stringify(dataToWrite));
+            console.log(`[addItemToFirestore] UID do Usuário: ${currentUser.uid}, isAdmin (cliente): ${userProfile.isAdmin}`);
+
+            try {
+                const collRef = getCollectionRef(collectionNameKey, isPublic);
+                await addDoc(collRef, dataToWrite);
+                showNotification(`${collectionDisplayName(collectionNameKey).singular} adicionado com sucesso!`, "success");
+            } catch (e) {
+                showNotification(`Erro ao adicionar ${collectionDisplayName(collectionNameKey).singular}. Detalhes no console.`, "error");
+                console.error(`[addItemToFirestore] Falha ao adicionar em '${collectionNameKey}'. Path: artifacts/${currentAppId}/${isPublic ? 'public/data/' : ''}${collectionNameKey}. UID: ${currentUser.uid}. Dados:`, dataToWrite, "Objeto do Erro:", e);
+                throw e;
+            }
+        }
+
+        // Atualiza um item existente no Firestore
+        async function updateItemInFirestore(collectionNameKey, id, data, isPublic = true, targetCollectionRef = null) {
+            if (!userProfile) {
+                showNotification("Perfil de usuário não carregado. Tente recarregar a página.", "error");
+                return Promise.reject(new Error("Perfil não carregado"));
+            }
+            if (!userProfile.isAdmin) {
+                showNotification("Acesso negado.", "error");
+                return Promise.reject(new Error("Acesso negado"));
+            }
+            if (!currentUser || !currentUser.uid) {
+                showNotification("Informação do usuário atual (UID) não disponível.", "error");
+                return Promise.reject(new Error("UID do usuário não disponível"));
+            }
+            const dataToWrite = { ...data, updatedAt: Timestamp.now(), updatedBy: currentUser.uid };
+            console.log(`Tentando atualizar item '${id}' em '${collectionNameKey}'. Path: artifacts/${currentAppId}/${isPublic ? 'public/data/' : ''}${collectionNameKey}`);
+            console.log("Dados para atualizar:", dataToWrite);
+
+            try {
+                const itemDocRef = doc(targetCollectionRef || getCollectionRef(collectionNameKey, isPublic), id);
+                await updateDoc(itemDocRef, dataToWrite);
+                showNotification(`${collectionDisplayName(collectionNameKey).singular} atualizado com sucesso!`, "success");
+            } catch (e) {
+                showNotification(`Erro ao atualizar ${collectionDisplayName(collectionNameKey).singular}. Detalhes no console.`, "error");
+                console.error(`Falha ao atualizar item '${id}' em '${collectionNameKey}'. Dados:`, dataToWrite, "Objeto do Erro:", e);
+                throw e;
+            }
+        }
+
+        // New helper function for direct deletion without confirmation UI
+        async function _performDirectDelete(collectionNameKey, id, isPublic = true, targetCollectionRef = null) {
+            try {
+                const docRef = doc(targetCollectionRef || getCollectionRef(collectionNameKey, isPublic), id);
+                await deleteDoc(docRef);
+                return { success: true };
+            } catch (e) {
+                console.error(`[Delete Item Direct] Falha ao excluir item '${id}' de '${collectionNameKey}'. Objeto do Erro:`, e);
+                return { success: false, error: e.message };
+            }
+        }
+
+        // Modified deleteItemFromFirestore to use the direct delete or trigger confirmation
+        async function deleteItemFromFirestore(collectionNameKey, id, isPublic = true, targetCollectionRef = null, skipConfirmation = false) {
+            let canDelete = false;
+            if (userProfile?.isAdmin) {
+                canDelete = true;
+            } else if (collectionNameKey === 'records' && userProfile?.isManager) {
+                // For records, check if the manager owns it (simplified check for now)
+                const record = globalData.records.find(r => r.id === id);
+                if (record && record.managerId === currentUser.uid) { // Assuming managerId exists on record and currentUser.uid is available
+                    canDelete = true;
+                } else if (userProfile.isAdmin) { // Admins can delete any record
+                    canDelete = true;
+                }
+            }
+
+            if (!canDelete) {
+                showNotification("Acesso negado para exclusão.", "error");
+                return;
+            }
+
+            if (skipConfirmation) {
+                return await _performDirectDelete(collectionNameKey, id, isPublic, targetCollectionRef);
+            }
+
+            // Normal confirmation flow for single deletion
+            confirmAction(
+                `Confirmar Exclusão`,
+                `Tem certeza que deseja excluir este item de ${collectionDisplayName(collectionNameKey).plural}? Esta ação não pode ser desfeita.`,
+                async () => {
+                    const result = await _performDirectDelete(collectionNameKey, id, isPublic, targetCollectionRef);
+                    if (result.success) {
+                        showNotification(`${collectionDisplayName(collectionNameKey).singular} excluído com sucesso!`, "success");
+                        // This will trigger onSnapshot and then renderApp, which will handle selectedRecordIds
+                        // selectedRecordIds.delete(id); // Removed, as onSnapshot update handles it
+                        // No explicit renderApp() here as onSnapshot listener takes care of it
+                    } else {
+                        showNotification(`Erro ao excluir ${collectionDisplayName(collectionNameKey).singular}.`, "error");
+                    }
+                }
+            );
+        }
+
+        // Exclui completamente um usuário (Auth e Firestore)
+        async function deleteUserCompletely(uid) {
+            if (!userProfile?.isAdmin) {
+                showNotification("Acesso negado.", "error");
+                return;
+            }
+            confirmAction(
+                `Excluir Usuário`,
+                `Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.`,
+                async () => {
+                    try {
+                        await deleteDoc(doc(getCollectionRef('users_profile', false), uid));
+                        if (deleteUserEndpoint) {
+                            const token = await currentUser.getIdToken();
+                            const resp = await fetch(deleteUserEndpoint, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${token}`
+                                },
+                                body: JSON.stringify({ uid })
+                            });
+                            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                        } else {
+                            console.warn('deleteUserEndpoint não configurado');
+                        }
+                        showNotification('Usuário excluído com sucesso!', 'success');
+                    } catch (err) {
+                        console.error('[deleteUserCompletely] Erro ao excluir usuário:', err);
+                        showNotification('Erro ao excluir usuário.', 'error');
+                    }
+                }
+            );
+        }
+
+        // Retorna nomes amigáveis para as coleções
+        function collectionDisplayName(key) {
+            const names = {
+                categories: { singular: "Categoria", plural: "Categorias" },
+                sectors: { singular: "Setor", plural: "Setores" },
+                employees: { singular: "Funcionário", plural: "Funcionários" },
+                rules: { singular: "Regra", plural: "Regras" },
+                users_profile: { singular: "Perfil de Usuário", plural: "Perfis de Usuários" },
+                records: { singular: "Registro", plural: "Registros" }
+            };
+            return names[key] || { singular: key.slice(0,-1) || key, plural: key };
+        }
+
+        // --- RENDERIZAÇÃO DAS VIEWS ---
+        // Função principal para renderizar a view atual
+        function renderApp() {
+            if (!currentUser && currentView !== 'login' && currentView !== 'firstAccess') {
+                // Se não há usuário logado e não está nas telas de login/primeiro acesso, redireciona para login
+                currentView = 'login';
+            }
+
+            if (!appContent) {
+                console.error("Elemento #app-content não encontrado no DOM.");
+                return;
+            }
+            appContent.innerHTML = '';
+            hideElement(initialLoadingDiv);
+
+            switch (currentView) {
+                case 'login': renderLoginPage(); break;
+                case 'firstAccess': renderFirstAccessPage(); break; // Nova tela de primeiro acesso
+                case 'changePassword': renderChangePasswordPage(); break; // Nova tela de redefinição de senha
+                case 'managerDashboard': renderManagerDashboard(); break;
+                case 'newRecord': renderNewRecordForm(); break;
+                case 'importRecords': renderImportRecordsPage(); break; // Nova tela de importação
+                case 'history': renderRecordHistory(); break;
+                case 'adminDashboard': renderAdminDashboard(); break;
+                case 'adminManageCategories':
+                    renderAdminManageGenericPage('categories', globalData.categories,
+                        [{ name: 'name', label: 'Nome da Categoria (A, B, C, D)', type: 'text' }, { name: 'description', label: 'Descrição', type: 'text' }],
+                        (data) => addItemToFirestore('categories', data),
+                        (id, data) => updateItemInFirestore('categories', id, data),
+                        (id) => deleteItemFromFirestore('categories', id)
+                    ); break;
+                case 'adminManageSectors':
+                    renderAdminManageGenericPage('sectors', globalData.sectors,
+                        [{ name: 'name', label: 'Nome do Setor', type: 'text' }],
+                        (data) => addItemToFirestore('sectors', data),
+                        (id, data) => updateItemInFirestore('sectors', id, data),
+                        (id) => deleteItemFromFirestore('sectors', id)
+                    ); break;
+                case 'adminManageEmployees':
+                    renderAdminManageGenericPage('employees', globalData.employees,
+                        [
+                            { name: 'name', label: 'Nome do Funcionário', type: 'text' },
+                            { name: 'registration', label: 'Matrícula', type: 'text' },
+                            { name: 'sector', label: 'Setor', type: 'select', options: globalData.sectors.map(s => ({ value: s.name, label: s.name })) }
+                        ],
+                        (data) => addItemToFirestore('employees', data),
+                        (id, data) => updateItemInFirestore('employees', id, data),
+                        (id) => deleteItemFromFirestore('employees', id)
+                    ); break;
+                case 'adminManageRules':
+                    renderAdminManageGenericPage('rules', globalData.rules,
+                        [
+                            { name: 'name', label: 'Título da Regra', type: 'text' },
+                            { name: 'description', label: 'Descrição', type: 'text' },
+                            { name: 'sector', label: 'Setor', type: 'select', options: [{ value: '*', label: 'Todos' }, ...globalData.sectors.map(s => ({ value: s.name, label: s.name }))] },
+                            { name: 'field', label: 'Campo', type: 'select', options: [{ value: 'eventDate', label: 'Data do Evento' }] },
+                            { name: 'type', label: 'Tipo de Validação', type: 'select', options: [
+                                { value: 'notWeekend', label: 'Data não pode ser fim de semana' },
+                                { value: 'weekendOnly', label: 'Somente fim de semana' },
+                                { value: 'min3DaysAhead', label: 'Data mínima de 3 dias após inclusão' },
+                                { value: 'maxDaysAhead', label: 'Data máxima após inclusão' }
+                            ] },
+                            { name: 'limitDays', label: 'Dias de Limite', type: 'number' },
+                            { name: 'workingDays', label: 'Considerar Dias Úteis?', type: 'select', options: [
+                                { value: 'true', label: 'Sim' },
+                                { value: 'false', label: 'Não' }
+                            ] },
+                            { name: 'message', label: 'Mensagem de Erro', type: 'text' }
+                        ],
+                        (data) => addItemToFirestore('rules', data),
+                        (id, data) => updateItemInFirestore('rules', id, data),
+                        (id) => deleteItemFromFirestore('rules', id)
+                    ); break;
+                case 'adminManageUsers': renderAdminManageUsersPage(); break;
+                case 'adminCreateUserProfile': renderAdminCreateUserProfilePage(); break;
+                default: renderLoginPage();
+            }
+        }
+
+        // Renderiza a página de login
+        function renderLoginPage() {
+            appContent.innerHTML = `
+                <div class="flex flex-col items-center justify-center min-h-[calc(100vh-120px)] p-4 animate-fadeIn">
+                    <div class="w-full max-w-sm bg-white shadow-xl rounded-xl p-8 border border-gray-200">
+                        <div class="flex flex-col items-center mb-6">
+                            <img src="favicon.png" alt="Logo Botafogo" class="h-16 w-16 rounded-lg mb-5">
+                            <h2 class="text-2xl font-semibold text-gray-800 text-center">Portal Quadro Móvel</h2>
+                            <p class="text-gray-500 mt-1 text-sm text-center">Acesso para gestores e administradores.</p>
+                        </div>
+                        <form id="login-form" class="space-y-5">
+                            <div>
+                                <label for="email" class="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                                <input id="email" type="email" required class="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-400 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="seu.email@safbfr.com.br">
+                            </div>
+                            <div>
+                                <label for="password" class="block text-xs font-medium text-gray-600 mb-1">Senha</label>
+                                <input id="password" type="password" required class="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-400 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="••••••••">
+                            </div>
+                            <button type="submit" class="w-full flex items-center justify-center text-sm bg-gray-800 hover:bg-gray-900 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-150 ease-in-out shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="3" y2="12"></line></svg>
+                                Entrar
+                            </button>
+                            <div class="text-center mt-4 text-xs">
+                                <a href="#" id="first-access-link" class="text-blue-600 hover:text-blue-700 hover:underline">Primeiro acesso ou esqueceu sua senha?</a>
+                            </div>
+                        </form>
+                    </div>
+                    <footer class="text-center p-6 mt-8 text-gray-500 text-xs">
+                        © ${new Date().getFullYear()} SAF Botafogo. Todos os direitos reservados.
+                    </footer>
+                </div>
+            `;
+            document.getElementById('login-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                handleLogin(email, password);
+            });
+            document.getElementById('first-access-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                currentView = 'firstAccess';
+                renderApp();
+            });
+        }
+
+        // Nova página para primeiro acesso / redefinição de senha via link por e-mail
+        function renderFirstAccessPage() {
+            appContent.innerHTML = `
+                <div class="flex flex-col items-center justify-center min-h-[calc(100vh-120px)] p-4 animate-fadeIn">
+                    <div class="w-full max-w-sm bg-white shadow-xl rounded-xl p-8 border border-gray-200">
+                        <div class="flex flex-col items-center mb-6">
+                            <img src="favicon.png" alt="Logo Botafogo" class="h-16 w-16 rounded-lg mb-5">
+                            <h2 class="text-2xl font-semibold text-gray-800 text-center">Primeiro Acesso / Redefinir Senha</h2>
+                            <p class="text-gray-500 mt-1 text-sm text-center">Informe seu e-mail para receber um link de redefinição de senha.</p>
+                        </div>
+                        <form id="first-access-form" class="space-y-5">
+                            <div>
+                                <label for="resetEmail" class="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                                <input id="resetEmail" type="email" required class="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-400 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="seu.email@safbfr.com.br">
+                            </div>
+                            <button type="submit" class="w-full flex items-center justify-center text-sm bg-gray-800 hover:bg-gray-900 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-150 ease-in-out shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1">
+                                Enviar Link de Redefinição
+                            </button>
+                            <div class="text-center mt-4 text-xs">
+                                <a href="#" id="back-to-login-link" class="text-blue-600 hover:text-blue-700 hover:underline">Voltar para o Login</a>
+                            </div>
+                        </form>
+                    </div>
+                    <footer class="text-center p-6 mt-8 text-gray-500 text-xs">
+                        © ${new Date().getFullYear()} SAF Botafogo. Todos os direitos reservados.
+                    </footer>
+                </div>
+            `;
+            document.getElementById('first-access-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('resetEmail').value;
+                const submitButton = e.target.querySelector('button[type="submit"]');
+                const originalButtonContent = submitButton.innerHTML;
+
+                submitButton.disabled = true;
+                submitButton.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Enviando...</span>`;
+
+                try {
+                    await sendPasswordResetEmail(auth, email);
+                    showNotification("Link de redefinição enviado para seu e-mail!", "success");
+                    currentView = 'login';
+                    renderApp();
+                }  catch (error) {
+                    console.error("Erro ao enviar link de redefinição:", error);
+                    showNotification(error.code === 'auth/user-not-found' ? "E-mail não cadastrado." : `Erro: ${error.message}`, "error");
+                } finally {
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonContent;
+                }
+            });
+            document.getElementById('back-to-login-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                currentView = 'login';
+                renderApp();
+            });
+        }
+
+        // Nova página para redefinição de senha direta
+        function renderChangePasswordPage() {
+            const inputBaseClass = "w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-800 placeholder-gray-400 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors";
+            appContent.innerHTML = `
+                <div class="flex flex-col items-center justify-center min-h-[calc(100vh-120px)] p-4 animate-fadeIn">
+                    <div class="w-full max-w-sm bg-white shadow-xl rounded-xl p-8 border border-gray-200">
+                        <h2 class="text-2xl font-semibold text-gray-800 text-center">Redefinir Senha</h2>
+                        <p class="text-gray-500 mt-1 text-sm text-center">Para sua segurança, confirme sua senha atual e defina uma nova.</p>
+                        <form id="change-password-form" class="space-y-5">
+                            <div>
+                                <label for="currentPassword" class="block text-xs font-medium text-gray-600 mb-1">Senha Atual:</label>
+                                <input id="currentPassword" type="password" required class="${inputBaseClass}" placeholder="••••••••">
+                            </div>
+                            <div>
+                                <label for="newPassword" class="block text-xs font-medium text-gray-600 mb-1">Nova Senha:</label>
+                                <input id="newPassword" type="password" required class="${inputBaseClass}" placeholder="••••••••">
+                            </div>
+                            <div>
+                                <label for="confirmNewPassword" class="block text-xs font-medium text-gray-600 mb-1">Confirmar Nova Senha:</label>
+                                <input id="confirmNewPassword" type="password" required class="${inputBaseClass}" placeholder="••••••••">
+                            </div>
+                            <button type="submit" class="w-full flex items-center justify-center text-sm bg-gray-800 hover:bg-gray-900 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-150 ease-in-out shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1">
+                                Redefinir Senha
+                            </button>
+                            <div class="text-center mt-4 text-xs">
+                                <button type="button" id="back-to-dashboard-change-password" class="text-blue-600 hover:text-blue-700 hover:underline">Voltar ao Painel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('change-password-form').addEventListener('submit', handleChangePassword);
+            document.getElementById('back-to-dashboard-change-password').addEventListener('click', () => {
+                currentView = 'changePassword';
+                renderApp();
+            });
+        }
+
+        async function handleChangePassword(e) {
+            e.preventDefault();
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+
+            if (newPassword !== confirmNewPassword) {
+                showNotification('As novas senhas não conferem.', 'error');
+                return;
+            }
+            if (newPassword.length < 6) {
+                showNotification('A senha deve ter pelo menos 6 caracteres.', 'error');
+                return;
+            }
+
+            const submitButton = e.target.querySelector('button[type="submit"]');
+            const originalContent = submitButton.innerHTML;
+            submitButton.disabled = true;
+            submitButton.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Processando...</span>`;
+
+            try {
+                const user = auth.currentUser;
+                const credential = EmailAuthProvider.credential(user.email, currentPassword);
+                await reauthenticateWithCredential(user, credential);
+                await updatePassword(user, newPassword);
+                showNotification('Senha atualizada com sucesso!', 'success');
+                currentView = userProfile.isAdmin ? 'adminDashboard' : 'managerDashboard';
+                renderApp();
+            } catch (error) {
+                console.error('Erro ao redefinir senha:', error);
+                showNotification(error.code === 'auth/wrong-password' ? 'Senha atual incorreta.' : `Erro: ${error.message}`, 'error');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalContent;
+            }
+        }
+
+
+        // Renderiza o painel do gestor
+        function renderManagerDashboard() {
+            appContent.innerHTML = `
+                <div class="animate-fadeIn bg-white p-6 sm:p-8 rounded-xl shadow-lg border border-gray-200">
+                    <h2 class="text-2xl font-semibold text-gray-800 mb-1">Bem-vindo, Gestor <span class="text-blue-600">${userProfile.name}</span>!</h2>
+                    <p class="text-gray-500 mb-6 text-sm">Setor: <span class="font-medium text-gray-700">${userProfile.sector}</span>. Utilize as opções abaixo.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
+                        <button id="btn-new-record" class="flex flex-col items-center justify-center text-center p-6 bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium rounded-lg transition-all duration-150 ease-in-out border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="mb-2 text-blue-600 size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                            Incluir Novo Registro
+                        </button>
+                        <button id="btn-import-records" class="flex flex-col items-center justify-center text-center p-6 bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium rounded-lg transition-all duration-150 ease-in-out border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="mb-2 text-blue-600 size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                            Importar Registros (Planilha)
+                        </button>
+                        <button id="btn-history" class="flex flex-col items-center justify-center text-center p-6 bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium rounded-lg transition-all duration-150 ease-in-out border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="mb-2 text-blue-600 size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z" /></svg>
+                            Histórico de Registros
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('btn-new-record').addEventListener('click', () => { currentView = 'newRecord'; renderApp(); });
+            document.getElementById('btn-import-records').addEventListener('click', () => { currentView = 'importRecords'; renderApp(); });
+            document.getElementById('btn-history').addEventListener('click', () => { currentView = 'history'; renderApp(); });
+        }
+
+        // Renderiza o formulário para inclusão de novo registro
+        function renderNewRecordForm() {
+            const categoriesOptions = globalData.categories.map(cat => `<option value="${cat.id}">${cat.name} - ${cat.description}</option>`).join('');
+            // Filtra funcionários pelo setor do gestor, se não for admin
+            const employeesFilteredBySector = userProfile.isAdmin ? globalData.employees : globalData.employees.filter(emp => emp.sector === userProfile.sector);
+            const employeesOptions = employeesFilteredBySector.map(emp => `<option value="${emp.id}">${emp.name} (${emp.registration}) - ${emp.sector}</option>`).join('') + '<option value="OUTROS">Outros</option>';
+            const inputBaseClass = "w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-800 placeholder-gray-400 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors";
+
+            appContent.innerHTML = `
+                <div class="max-w-xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow-lg border border-gray-200 animate-fadeIn">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-6 text-center">Incluir Novo Registro de Quadro Móvel</h2>
+                    <form id="new-record-form" class="space-y-5">
+                        <div>
+                            <label for="eventName" class="block text-xs font-medium text-gray-600 mb-1">Nome do Evento:</label>
+                            <input type="text" id="eventName" required class="${inputBaseClass}" placeholder="Ex: Jogo Botafogo vs Flamengo">
+                        </div>
+                        <div>
+                            <label for="eventDate" class="block text-xs font-medium text-gray-600 mb-1">Data do Evento:</label>
+                            <input type="date" id="eventDate" required class="${inputBaseClass}">
+                        </div>
+                        <div>
+                            <label for="category" class="block text-xs font-medium text-gray-600 mb-1">Classificação (Quadro Móvel):</label>
+                            <select id="category" required class="${inputBaseClass}">${categoriesOptions ? `<option value="">Selecione a Classificação</option>${categoriesOptions}` : `<option value="">Nenhuma categoria cadastrada</option>`}</select>
+                        </div>
+                        <div>
+                            <label for="employee" class="block text-xs font-medium text-gray-600 mb-1">Funcionário:</label>
+                            <select id="employee" required class="${inputBaseClass}">${employeesOptions ? `<option value="">Selecione o Funcionário</option>${employeesOptions}` : `<option value="">Nenhum funcionário disponível para seu setor</option>`}</select>
+                        </div>
+                        <div>
+                            <label for="notes" class="block text-xs font-medium text-gray-600 mb-1">Observações (obrigatório se selecionar "Outros"):</label>
+                            <textarea id="notes" class="${inputBaseClass} h-24" placeholder="Detalhes adicionais..."></textarea>
+                        </div>
+                        <div class="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 pt-4">
+                            <button type="button" id="cancel-new-record" class="w-full sm:w-auto px-4 py-2.5 text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300">Cancelar</button>
+                            <button type="submit" class="w-full sm:w-auto px-4 py-2.5 text-sm bg-gray-800 hover:bg-gray-900 text-white font-medium rounded-lg transition-colors duration-150 ease-in-out shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5"><path d="M12 5v14M5 12h14"></path></svg>
+                                Salvar Registro
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            document.getElementById('cancel-new-record').addEventListener('click', () => {
+                currentView = userProfile.isAdmin ? 'adminDashboard' : 'managerDashboard';
+                renderApp();
+            });
+            document.getElementById('new-record-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitButton = e.target.querySelector('button[type="submit"]');
+                const originalButtonContent = submitButton.innerHTML;
+                submitButton.disabled = true;
+                submitButton.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Salvando...</span>`;
+
+                const eventName = document.getElementById('eventName').value;
+                const eventDate = document.getElementById('eventDate').value;
+                const categoryId = document.getElementById('category').value;
+                const employeeId = document.getElementById('employee').value;
+                const notes = document.getElementById('notes').value;
+
+                if (employeeId === 'OUTROS' && !notes.trim()) {
+                    openModal(
+                        'Observação Obrigatória',
+                        '<p>Para selecionar \"Outros\" no campo Funcionário é obrigatório informar o nome completo no campo Observações.</p>',
+                        null,
+                        '',
+                        () => {},
+                        'Fechar'
+                    );
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonContent;
+                    return;
+                }
+
+                if (!eventName || !eventDate || !categoryId || !employeeId) {
+                    showNotification("Nome do Evento, Data do Evento, Categoria e Funcionário são obrigatórios.", "error");
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonContent;
+                    return;
+                }
+
+                const employeeName = employeeId === 'OUTROS'
+                    ? notes.trim()
+                    : globalData.employees.find(emp => emp.id === employeeId)?.name;
+
+                const newRecordData = {
+                    eventName,
+                    eventDate,
+                    categoryId, categoryName: globalData.categories.find(cat => cat.id === categoryId)?.name,
+                    employeeId,
+                    employeeName,
+                    notes
+                };
+
+                // Validação de duplicidade
+                const isDuplicate = globalData.records.some(existingRecord =>
+                    existingRecord.eventDate === newRecordData.eventDate &&
+                    existingRecord.employeeId === newRecordData.employeeId
+                );
+
+                if (isDuplicate) {
+                    await new Promise(resolve => {
+                        openModal(
+                            "Registro Duplicado Detectado",
+                            `<p>Já existe um registro para a data "${new Date(newRecordData.eventDate + 'T00:00:00').toLocaleDateString('pt-BR')}" e o funcionário "${newRecordData.employeeName}".</p><p>Deseja adicionar mesmo assim?</p>`,
+                            async () => {
+                                try {
+                                    await addRecordToFirestore(newRecordData);
+                                    showNotification("Registro adicionado com sucesso (duplicado aceito)!", "success");
+                                    currentView = userProfile.isAdmin ? 'adminDashboard' : 'managerDashboard';
+                                    renderApp();
+                                } catch (error) {
+                                    console.error("Falha ao adicionar registro duplicado:", error);
+                                    showNotification("Falha ao adicionar registro. Verifique o console.", "error");
+                                } finally {
+                                    resolve();
+                                }
+                            },
+                            "Sim, Adicionar",
+                            () => {
+                                showNotification("Adição de registro cancelada.", "info");
+                                resolve();
+                            },
+                            "Não, Cancelar"
+                        );
+                    });
+                } else {
+                    try {
+                        await addRecordToFirestore(newRecordData);
+                        showNotification("Registro adicionado com sucesso!", "success");
+                        currentView = userProfile.isAdmin ? 'adminDashboard' : 'managerDashboard';
+                        renderApp();
+                    } catch (error) {
+                        console.error("Falha ao submeter formulário de novo registro:", error);
+                        showNotification("Falha ao adicionar registro. Verifique o console para detalhes.", "error");
+                    }
+                }
+
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalButtonContent;
+            });
+        }
+
+        // Função para gerar e baixar o modelo de planilha Excel
+        function downloadExcelTemplate() {
+            if (typeof XLSX === 'undefined') {
+                showNotification("Erro: Biblioteca de exportação XLSX não carregada.", "error");
+                console.error("XLSX library (SheetJS) not found. Make more details in console");
+                return;
+            }
+            if (!userProfile) {
+                showNotification("Perfil de usuário não carregado. Tente recarregar a página.", "error");
+                return;
+            }
+
+            const headers = ["Nome do Evento", "Data do Evento", "Classificação", "Funcionário", "Observações"];
+            const mainSheetName = "Registros";
+            const listsSheetName = "Listas"; // Name for the lists sheet
+
+            // Filter employees by manager's sector if not admin, otherwise get all
+            const employeesForLists = (userProfile.isAdmin
+                ? globalData.employees.map(emp => emp.name)
+                : globalData.employees.filter(emp => emp.sector === userProfile.sector).map(emp => emp.name))
+                .concat('Outros');
+
+            // Create workbook and main sheet
+            const workbook = XLSX.utils.book_new();
+            // Main sheet: Row 1 has headers. No data in subsequent rows.
+            const ws = XLSX.utils.aoa_to_sheet([headers]);
+
+            // Create lists sheet with only employee names
+            const wsLists = XLSX.utils.aoa_to_sheet([["Funcionários"], ...employeesForLists.map(name => [name])]); // Column A: Employee names
+
+            // No data validations or dropdowns are added to the main sheet.
+            // This ensures the main sheet is clean as requested.
+
+            // Add sheets to workbook
+            XLSX.utils.book_append_sheet(workbook, ws, mainSheetName);
+            XLSX.utils.book_append_sheet(workbook, wsLists, listsSheetName);
+
+            // Explicitly set the visibility of the "Listas" sheet to visible (not hidden)
+            if (!workbook.Workbook) workbook.Workbook = {};
+            if (!workbook.Workbook.Sheets) workbook.Workbook.Sheets = [];
+
+            // Find the Lists sheet and ensure it's not hidden.
+            const listsSheetIdx = workbook.SheetNames.indexOf(listsSheetName);
+            if (listsSheetIdx !== -1 && workbook.Workbook.Sheets[listsSheetIdx]) {
+                delete workbook.Workbook.Sheets[listsSheetIdx].Hidden; // Ensure it's not hidden
+            }
+
+
+            XLSX.writeFile(workbook, "modelo_quadro_movel.xlsx");
+            showNotification("Modelo de planilha baixado com sucesso!", "success");
+        }
+
+
+        // Nova função para importar registros via planilha
+        function renderImportRecordsPage() {
+            appContent.innerHTML = `
+                <div class="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow-lg border border-gray-200 animate-fadeIn">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800">Importar Registros de Quadro Móvel (Planilha)</h2>
+                        <div class="flex items-center space-x-2">
+                               <button id="btn-download-template" class="px-2 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="mr-1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 = 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                Baixar Modelo (Planilha)
+                             </button>
+                               <button id="btn-back-dashboard-import" class="px-2 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors">Voltar</button>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-4">
+                        Faça o upload de uma planilha Excel (.xlsx, .xls) ou CSV. As colunas esperadas são:
+                        <code class="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">Nome do Evento</code>,
+                        <code class="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">Data do Evento</code> (formato AAAA-MM-DD ou DD/MM/AAAA),
+                        <code class="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">Classificação</code> (Nome da Categoria),
+                        <code class="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">Funcionário</code> (Nome do Funcionário),
+                        <code class="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">Observações</code> (Opcional).
+                    </p>
+                    <input type="file" id="file-input" accept=".xlsx, .xls, .csv" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-colors cursor-pointer">
+                    <div id="import-status" class="mt-6 p-4 rounded-lg bg-gray-50 border border-gray-200 hidden">
+                        <h3 class="font-semibold text-gray-800 mb-2">Resultados da Importação:</h3>
+                        <p id="import-summary" class="text-sm text-gray-700 mb-3"></p>
+                        <div id="import-errors" class="space-y-1 text-red-700 text-xs max-h-48 overflow-y-auto"></div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('btn-back-dashboard-import').addEventListener('click', () => {
+                currentView = userProfile.isAdmin ? 'adminDashboard' : 'managerDashboard';
+                renderApp();
+            });
+            document.getElementById('file-input').addEventListener('change', handleFileUpload);
+            document.getElementById('btn-download-template').addEventListener('click', downloadExcelTemplate); // Event listener for new button
+        }
+
+        // Lida com o upload do arquivo e processa os dados
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                showNotification("Nenhum arquivo selecionado.", "info");
+                return;
+            }
+
+            const importStatusDiv = document.getElementById('import-status');
+            const importSummaryP = document.getElementById('import-summary');
+            const importErrorsDiv = document.getElementById('import-errors');
+            showElement(importStatusDiv);
+            importSummaryP.innerHTML = 'Processando... <span class="loader_small_blue ml-2 inline-block align-middle"></span>';
+            importErrorsDiv.innerHTML = '';
+            importStatusDiv.classList.remove('bg-red-50', 'bg-green-50'); // Limpa estados anteriores
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+
+                    // Read all rows to get headers from the first row.
+                    const allRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    const headers = allRows[0].map(h => String(h).trim());
+
+                    const expectedHeaders = ["Nome do Evento", "Data do Evento", "Classificação", "Funcionário", "Observações"];
+                    const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+
+                    if (missingHeaders.length > 0) {
+                        showNotification(`Cabeçalhos ausentes: ${missingHeaders.join(', ')}. Verifique sua planilha.`, "error");
+                        importSummaryP.textContent = `Erro: Cabeçalhos ausentes: ${missingHeaders.join(', ')}.`;
+                        importStatusDiv.classList.add('bg-red-50');
+                        return;
+                    }
+
+                    // Start parsing data from the 2nd row (index 1) of the Excel sheet,
+                    // and use `raw: false` to attempt to convert dates to strings.
+                    // header: 1 means the 1st row (index 0) contains headers.
+                    // range: 1 means start reading data from the 2nd row (index 1).
+                    const recordsRaw = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 1, raw: false });
+
+                    // Manually map `recordsRaw` to objects using the `headers` from Excel row 1.
+                    const recordsToProcess = recordsRaw.map(row => {
+                        const newRecord = {};
+                        headers.forEach((header, index) => {
+                            // Ensure value is converted to string before trimming,
+                            // handling potential undefined/null values robustly.
+                            newRecord[header.trim()] = (row[index] !== undefined && row[index] !== null) ? String(row[index]).trim() : '';
+                        });
+                        return newRecord;
+                    }).filter(record => Object.values(record).some(value => value !== undefined && value !== '')); // Remove entirely empty rows
+
+
+                    let recordsToAdd = [];
+                    let duplicateRecords = [];
+                    let errorsBeforeImport = [];
+
+                    // Step 1: Pre-validation and identification of duplicates
+                    for (const record of recordsToProcess) {
+                        // rowNum needs to account for skipped header (1) + current row index (0-based) + 1
+                        const rowNum = recordsToProcess.indexOf(record) + 2;
+                        try {
+                            const eventName = record["Nome do Evento"];
+                            const eventDateRaw = record["Data do Evento"]; // This is now already a string thanks to raw:false and String() conversion
+                            const categoryName = record["Classificação"];
+                            const employeeName = record["Funcionário"];
+                            const notes = record["Observações"] || '';
+
+                            if (!eventName || !eventDateRaw || !categoryName || !employeeName) {
+                                throw new Error("Campos obrigatórios (Nome do Evento, Data do Evento, Classificação, Funcionário) não podem estar vazios.");
+                            }
+
+                            // Validação e formatação da data do evento
+                            let eventDate;
+                            // Check if eventDateRaw is a number (Excel serial date) and convert it
+                            if (typeof eventDateRaw === 'number') {
+                                const dateObj = XLSX.SSF.parse_date_code(eventDateRaw);
+                                eventDate = `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
+                            } else if (eventDateRaw.match(/^\d{4}-\d{2}-\d{2}$/)) { // AAAA-MM-DD
+                                eventDate = eventDateRaw;
+                            } else if (eventDateRaw.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) { // M/D/YYYY or MM/DD/YYYY
+                                const parts = eventDateRaw.split('/');
+                                eventDate = `${parts[2]}-${String(parts[0]).padStart(2, '0')}-${String(parts[1]).padStart(2, '0')}`; // Assuming M/D/YYYY
+                            } else if (eventDateRaw.match(/^\d{1,2}\/\d{1,2}\/\d{2}$/)) { // M/D/YY or MM/DD/YY
+                                const parts = eventDateRaw.split('/');
+                                const year = parseInt(parts[2], 10) + 2000; // Assuming 2000+ for 2-digit years
+                                eventDate = `${year}-${String(parts[0]).padStart(2, '0')}-${String(parts[1]).padStart(2, '0')}`; // Assuming M/D/YY
+                            } else if (eventDateRaw.match(/^\d{2}\/\d{2}\/\d{4}$/)) { // DD/MM/YYYY
+                                const parts = eventDateRaw.split('/');
+                                eventDate = `${parts[2]}-${parts[1]}-${parts[0]}`; // Convert to AAAA-MM-DD
+                            } else {
+                                throw new Error(`Formato de data inválido para 'Data do Evento': ${eventDateRaw}. Use AAAA-MM-DD, DD/MM/AAAA ou M/D/AA(AAAA).`);
+                            }
+
+
+                            const category = globalData.categories.find(c => c.name?.toLowerCase() === categoryName.toLowerCase());
+                            if (!category) {
+                                throw new Error(`Categoria '${categoryName}' não encontrada na base de dados. Cadastre a categoria primeiro.`);
+                            }
+
+                            let employeeId; let finalEmployeeName;
+                            if (employeeName.toLowerCase() === 'outros') {
+                                if (!notes.trim()) {
+                                    throw new Error("Funcionário marcado como 'Outros', mas 'Observações' está vazio. Informe o nome completo do funcionário.");
+                                }
+                                employeeId = 'OUTROS';
+                                finalEmployeeName = notes.trim();
+                            } else {
+                                const employeesInSector = userProfile.isAdmin ? globalData.employees : globalData.employees.filter(emp => emp.sector === userProfile.sector);
+                                const employee = employeesInSector.find(emp => emp.name?.toLowerCase() === employeeName.toLowerCase());
+                                if (!employee) {
+                                    throw new Error(`Funcionário '${employeeName}' não encontrado ou não pertence ao seu setor ('${userProfile.sector}').`);
+                                }
+                                employeeId = employee.id;
+                                finalEmployeeName = employee.name;
+                            }
+
+                            const dataToSave = {
+                                eventName,
+                                eventDate,
+                                categoryId: category.id,
+                                categoryName: category.name,
+                                employeeId,
+                                employeeName: finalEmployeeName,
+                                notes,
+                            };
+
+                            // Check for duplicates in existing records
+                            const isDuplicate = globalData.records.some(existingRecord =>
+                                existingRecord.eventDate === dataToSave.eventDate &&
+                                existingRecord.employeeId === dataToSave.employeeId
+                            );
+
+                            if (isDuplicate) {
+                                duplicateRecords.push({ rowNum, data: dataToSave });
+                            } else {
+                                recordsToAdd.push({ rowNum, data: dataToSave });
+                            }
+
+                        } catch (validationError) {
+                            errorsBeforeImport.push(`Linha ${rowNum}: ${validationError.message}`);
+                            console.error(`Erro de validação na linha ${rowNum}:`, validationError);
+                        }
+                    }
+
+                    if (errorsBeforeImport.length > 0) {
+                        importSummaryP.textContent = `Erros de validação encontrados. Nenhum registro importado.`;
+                        importErrorsDiv.innerHTML = errorsBeforeImport.map(err => `<p class="text-xs font-mono break-words">${err}</p>`).join('');
+                        importStatusDiv.classList.add('bg-red-50');
+                        showNotification("Erro na validação da planilha. Verifique os detalhes.", "error", 8000);
+                        return; // Stop if there are validation errors
+                    }
+
+                    let proceedWithDuplicates = true;
+                    if (duplicateRecords.length > 0) {
+                        const duplicateListHtml = duplicateRecords.map(d =>
+                            `<p class="text-xs font-mono">Linha ${d.rowNum}: Evento "${d.data.eventName}" (${new Date(d.data.eventDate + 'T00:00:00').toLocaleDateString('pt-BR')}), Funcionário: "${d.data.employeeName}"</p>`
+                        ).join('');
+
+                        await new Promise(resolve => {
+                            openModal(
+                                "Registros Duplicados Encontrados",
+                                `
+                                <p class="mb-3">A planilha contém ${duplicateRecords.length} registro(s) que parecem ser duplicados, com a mesma data do evento e funcionário já existentes no sistema:</p>
+                                <div class="max-h-32 overflow-y-auto p-2 bg-gray-100 rounded-md border border-gray-200 mb-4">${duplicateListHtml}</div>
+                                <p>Deseja prosseguir com a inclusão desses registros duplicados?</p>
+                                `,
+                                () => { proceedWithDuplicates = true; resolve(); },
+                                'Sim, Prosseguir',
+                                () => { proceedWithDuplicates = false; resolve(); },
+                                'Não, Ignorar Duplicados'
+                            );
+                        });
+                    }
+
+                    let successfulImports = 0;
+                    let failedImports = 0;
+                    let importErrorMessages = [];
+
+                    // Step 2: Perform the import based on user's decision
+                    for (const recordInfo of recordsToAdd) {
+                        const result = await addRecordToFirestore(recordInfo.data);
+                        if (result.success) {
+                            successfulImports++;
+                        } else {
+                            failedImports++;
+                            importErrorMessages.push(`Linha ${recordInfo.rowNum}: ${result.error || 'Erro desconhecido ao adicionar registro.'}`);
+                        }
+                    }
+
+                    if (proceedWithDuplicates) {
+                        for (const recordInfo of duplicateRecords) {
+                            const result = await addRecordToFirestore(recordInfo.data);
+                            if (result.success) {
+                                successfulImports++;
+                            } else {
+                                failedImports++;
+                                importErrorMessages.push(`Linha ${recordInfo.rowNum} (duplicado): ${result.error || 'Erro desconhecido ao adicionar registro.'}`);
+                            }
+                        }
+                    } else {
+                        // If not proceeding with duplicates, add them to failed imports for reporting
+                        failedImports += duplicateRecords.length;
+                        duplicateRecords.forEach(d => {
+                            importErrorMessages.push(`Linha ${d.rowNum}: Registro duplicado ignorado por escolha do usuário.`);
+                        });
+                    }
+
+                    // Final Status Update
+                    if (successfulImports > 0) {
+                        showNotification(`Importação concluída. ${successfulImports} registro(s) adicionado(s) com sucesso!`, "success");
+                        importStatusDiv.classList.add('bg-green-50');
+                    }
+                    if (failedImports > 0) {
+                        showNotification(`Atenção: ${failedImports} registro(s) falharam ou foram ignorados na importação.`, "error");
+                        importStatusDiv.classList.add('bg-red-50');
+                        importErrorsDiv.innerHTML = importErrorMessages.map(err => `<p class="text-xs font-mono break-words">${err}</p>`).join('');
+                    }
+                    importSummaryP.textContent = `Importação concluída: ${successfulImports} sucesso(s), ${failedImports} falha(s)/ignorados.`;
+
+                    // Modal de confirmação com resumo da importação
+                    let resultHtml = `<p>${successfulImports} registro(s) adicionado(s) com sucesso.</p>`;
+                    if (failedImports > 0) {
+                        const errorsHtml = importErrorMessages
+                            .map(err => `<p class="font-mono break-words">${err}</p>`)
+                            .join('');
+                        resultHtml += `
+                            <p class="mt-4">${failedImports} registro(s) apresentaram problemas:</p>
+                            <div class="max-h-32 overflow-y-auto p-2 bg-gray-100 rounded-md border border-gray-200 mt-2 space-y-1 text-sm text-red-700">
+                                ${errorsHtml}
+                            </div>
+                        `;
+                    }
+                    openModal('Importação Concluída', resultHtml, null, '', () => {}, 'Fechar');
+
+                } catch (generalError) {
+                    showNotification("Erro ao processar o arquivo. Verifique o formato.", "error");
+                    importSummaryP.textContent = `Erro geral: ${generalError.message}.`;
+                    importStatusDiv.classList.add('bg-red-50');
+                    console.error("Erro geral no processamento do arquivo:", generalError);
+                } finally {
+                    event.target.value = ''; // Limpa o input file para permitir re-upload do mesmo arquivo
+                }
+            };
+
+            if (file.name.endsWith('.csv')) {
+                reader.readAsText(file); // For CSV, read as text
+            } else {
+                reader.readAsArrayBuffer(file); // For XLSX/XLS, read as array buffer
+            }
+        }
+
+
+        // Renderiza o histórico de registros
+        function renderRecordHistory() {
+
+            // Generates the table HTML based on the provided data
+            const generateTableHtml = (data) => {
+                currentFilteredRecordsForExport = [...data];
+                const tableRows = data.map(record => `
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-4 py-2 text-[11px] text-gray-600 whitespace-nowrap">
+                            <input type="checkbox" class="record-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-2" data-id="${record.id}" ${selectedRecordIds.has(record.id) ? 'checked' : ''}>
+                            ${record.createdAt?.toDate?.().toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}) || 'N/A'}
+                        </td>
+                        <td class="px-4 py-2 text-[11px] text-gray-700 font-medium whitespace-nowrap">${record.eventName || 'N/A'} <span class="text-gray-500">(${record.eventDate ? new Date(record.eventDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A'})</span></td>
+                        <td class="px-4 py-2 text-[11px] text-gray-600 whitespace-nowrap">${record.categoryName || 'N/A'}</td>
+                        <td class="px-4 py-2 text-[11px] text-gray-600 whitespace-nowrap">${record.employeeName || 'N/A'}</td>
+                        <td class="px-4 py-2 text-[11px] text-gray-600 whitespace-nowrap">${record.sector}</td>
+                        <td class="px-4 py-2 text-[11px] text-gray-600 whitespace-nowrap">${record.managerName}</td>
+                        <td class="px-4 py-2 text-[11px] text-gray-500 max-w-xs truncate" title="${record.notes || ''}">${record.notes || '-'}</td>
+                        <!-- Coluna de Ação visível se o usuário for gestor do setor do registro ou admin -->
+                        ${(userProfile.isManager && record.sector === userProfile.sector && !userProfile.isAdmin && record.managerId === currentUser.uid) || userProfile.isAdmin ?
+                            `<td class="px-4 py-2 text-[11px] text-center">
+                                <button class="btn-delete-record text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-md" data-id="${record.id}" title="Excluir Registro">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                </button>
+                            </td>` : '<td class="px-4 py-2"></td>'
+                        }
+                    </tr>
+                `).join('');
+
+                return data.length === 0 ?
+                    `<div class="text-center py-10"><p class="text-gray-500 text-sm">Nenhum registro encontrado para os filtros aplicados.</p></div>` :
+                    `<div class="overflow-x-auto border border-gray-200 rounded-lg">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-1.5 text-[11px] font-medium text-gray-500 uppercase tracking-wider text-left">
+                                        <input type="checkbox" id="select-all-records-checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mr-2">
+                                        Data Criação
+                                    </th>
+                                    <th class="px-4 py-1.5 text-[11px] font-medium text-gray-500 uppercase tracking-wider text-left">Evento (Data)</th>
+                                    <th class="px-4 py-1.5 text-[11px] font-medium text-gray-500 uppercase tracking-wider text-left">Categoria</th>
+                                    <th class="px-4 py-1.5 text-[11px] font-medium text-gray-500 uppercase tracking-wider text-left">Funcionário</th>
+                                    <th class="px-4 py-1.5 text-[11px] font-medium text-gray-500 uppercase tracking-wider text-left">Setor</th>
+                                    <th class="px-4 py-2 text-[11px] font-medium text-gray-500 uppercase tracking-wider text-left">Gestor</th>
+                                    <th class="px-4 py-2 text-[11px] font-medium text-gray-500 uppercase tracking-wider text-left">Obs.</th>
+                                    ${(userProfile.isAdmin || userProfile.isManager) ? '<th class="px-4 py-2 text-[11px] text-left font-medium text-gray-500 uppercase tracking-wider">Ação</th>' : ''}
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">${tableRows}</tbody>
+                        </table>
+                    </div>
+                    <div id="bulk-actions-container" class="mt-4 flex justify-between items-center hidden">
+                        <span id="selected-records-count" class="text-sm text-gray-600">0 registros selecionados</span>
+                        <button id="btn-delete-selected-records" class="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-1.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            Excluir Selecionados
+                        </button>
+                    </div>`;
+            };
+
+            // Helper to get records based on the current filters
+            const getFilteredRecords = () => {
+                let data = [...globalData.records];
+                const term = filterState.searchTerm.trim().toLowerCase();
+                if (term) {
+                    data = data.filter(r =>
+                        (r.eventName && r.eventName.toLowerCase().includes(term)) ||
+                        (r.employeeName && r.employeeName.toLowerCase().includes(term)) ||
+                        (r.notes && r.notes.toLowerCase().includes(term))
+                    );
+                }
+                if (filterState.eventName.trim()) {
+                    const t = filterState.eventName.trim().toLowerCase();
+                    data = data.filter(r => r.eventName?.toLowerCase().includes(t));
+                }
+                if (filterState.employeeId) {
+                    data = data.filter(r => r.employeeId === filterState.employeeId);
+                }
+                if (filterState.categoryId) {
+                    data = data.filter(r => r.categoryId === filterState.categoryId);
+                }
+                if (filterState.notes.trim()) {
+                    const n = filterState.notes.trim().toLowerCase();
+                    data = data.filter(r => r.notes?.toLowerCase().includes(n));
+                }
+                if (userProfile.isAdmin && filterState.sector) {
+                    data = data.filter(r => r.sector === filterState.sector);
+                }
+                if (userProfile.isAdmin && filterState.managerName) {
+                    data = data.filter(r => r.managerName === filterState.managerName);
+                }
+                if (filterState.eventDateStart) {
+                    data = data.filter(r => r.eventDate >= filterState.eventDateStart);
+                }
+                if (filterState.eventDateEnd) {
+                    data = data.filter(r => r.eventDate <= filterState.eventDateEnd);
+                }
+                if (filterState.creationDateStart) {
+                    data = data.filter(r => r.createdAt?.toDate?.() >= new Date(filterState.creationDateStart + 'T00:00:00'));
+                }
+                if (filterState.creationDateEnd) {
+                    const endDate = new Date(filterState.creationDateEnd + 'T23:59:59');
+                    data = data.filter(r => r.createdAt?.toDate?.() <= endDate);
+                }
+                return data;
+            };
+
+            const applyFilters = () => {
+                const records = getFilteredRecords();
+                const container = document.getElementById('record-history-table-container');
+                if (container) {
+                    container.innerHTML = generateTableHtml(records);
+                    document.getElementById('btn-delete-selected-records')?.addEventListener('click', deleteSelectedRecords);
+                }
+                updateSelectedCountUI();
+            };
+
+            const clearFilters = () => {
+                filterState = {
+                    ...filterState,
+                    searchTerm: '',
+                    eventName: '',
+                    employeeId: '',
+                    categoryId: '',
+                    notes: '',
+                    sector: '',
+                    managerName: '',
+                    eventDateStart: '',
+                    eventDateEnd: '',
+                    creationDateStart: '',
+                    creationDateEnd: ''
+                };
+                document.querySelectorAll('#filters-container .filter-input').forEach(input => input.value = '');
+                applyFilters();
+            };
+
+            const initialRecordsToDisplay = getFilteredRecords();
+
+            appContent.innerHTML = `
+                <div class="animate-fadeIn bg-white p-6 sm:p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+                        <div>
+                            <h2 class="text-xl font-semibold text-gray-800">Histórico de Registros</h2>
+                            ${userProfile.isManager && !userProfile.isAdmin ? `<p class="text-xs text-gray-500 mt-0.5">Setor: ${userProfile.sector}</p>` : ''}
+                        </div>
+                        <div class="flex items-center space-x-2 mt-3 md:mt-0">
+                            <button id="btn-export-csv" class="px-3 py-1.5 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-1"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>CSV</button>
+                            <button id="btn-export-xlsx" class="px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>XLSX</button>
+                            <button id="btn-back-dashboard" class="px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg">Voltar</button>
+                        </div>
+                    </div>
+                    <!-- Nova estrutura de filtros -->
+                    <div id="filters-container" class="filter-wrapper mb-6 space-y-4">
+                        <div class="filter-group">
+                            <label for="filter-search" class="filter-label">Busca Rápida:</label>
+                            <div class="relative">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1011.5 19.5a7.5 7.5 0 005.15-2.85z" /></svg>
+                                <input type="text" id="filter-search" class="filter-input pl-9" placeholder="Nome, evento, observações..." value="${filterState.searchTerm}">
+                            </div>
+                        </div>
+                        <details class="filter-toggle w-full" open>
+                            <summary>Filtros Avançados</summary>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
+                                <div class="filter-group">
+                                    <label for="filter-event-name" class="filter-label">Nome do Evento:</label>
+                                    <input type="text" id="filter-event-name" class="filter-input" placeholder="Ex: Jogo Botafogo vs Flamengo" value="${filterState.eventName}">
+                                </div>
+                                <div class="filter-group">
+                                    <label for="filter-notes" class="filter-label">Observações:</label>
+                                    <input type="text" id="filter-notes" class="filter-input" placeholder="Texto das observações" value="${filterState.notes}">
+                                </div>
+                                <div class="filter-group">
+                                    <label for="filter-employee" class="filter-label">Funcionário:</label>
+                                    <select id="filter-employee" class="filter-input">
+                                        <option value="">Todos</option>
+                                        ${globalData.employees.map(e => `<option value="${e.id}" ${filterState.employeeId === e.id ? 'selected' : ''}>${e.name}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label for="filter-category" class="filter-label">Categoria:</label>
+                                    <select id="filter-category" class="filter-input">
+                                        <option value="">Todas</option>
+                                        ${globalData.categories.map(c => `<option value="${c.id}" ${filterState.categoryId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                                    </select>
+                                </div>
+                                ${userProfile.isAdmin ? `
+                                    <div class="filter-group">
+                                        <label for="filter-sector" class="filter-label">Setor:</label>
+                                        <select id="filter-sector" class="filter-input">
+                                            <option value="">Todos</option>
+                                            ${[...new Set(globalData.records.map(r => r.sector))].filter(Boolean).sort().map(s => `<option value="${s}" ${filterState.sector === s ? 'selected' : ''}>${s}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div class="filter-group">
+                                        <label for="filter-manager" class="filter-label">Gestor Lançador:</label>
+                                        <select id="filter-manager" class="filter-input">
+                                            <option value="">Todos</option>
+                                            ${[...new Set(globalData.records.map(r => r.managerName))].filter(Boolean).sort().map(m => `<option value="${m}" ${filterState.managerName === m ? 'selected' : ''}>${m}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                ` : ''}
+                                <div class="filter-group">
+                                    <label for="filter-event-date-start" class="filter-label">Data Evento (De):</label>
+                                    <input type="date" id="filter-event-date-start" class="filter-input" value="${filterState.eventDateStart}">
+                                </div>
+                                <div class="filter-group">
+                                    <label for="filter-event-date-end" class="filter-label">Data Evento (Até):</label>
+                                    <input type="date" id="filter-event-date-end" class="filter-input" value="${filterState.eventDateEnd}">
+                                </div>
+                                <div class="filter-group">
+                                    <label for="filter-creation-date-start" class="filter-label">Criação (De):</label>
+                                    <input type="date" id="filter-creation-date-start" class="filter-input" value="${filterState.creationDateStart}">
+                                </div>
+                                <div class="filter-group">
+                                    <label for="filter-creation-date-end" class="filter-label">Criação (Até):</label>
+                                    <input type="date" id="filter-creation-date-end" class="filter-input" value="${filterState.creationDateEnd}">
+                                </div>
+                            </div>
+                        </details>
+                        <div class="flex justify-end space-x-3">
+                            <button id="btn-clear-filters" class="px-2 py-1.5 text-xs font-medium bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors shadow-sm">Limpar Filtros</button>
+                            <button id="btn-apply-filters" class="px-2 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm">Aplicar Filtros</button>
+                        </div>
+                    </div>
+                    <div id="record-history-table-container">
+                        ${generateTableHtml(initialRecordsToDisplay)}
+                    </div>
+                </div>
+            `;
+
+            // Function to update the count of selected records and enable/disable the delete button
+            updateSelectedCountUI = () => {
+                const count = selectedRecordIds.size;
+                const bulkActionsContainer = document.getElementById('bulk-actions-container');
+                const selectedRecordsCountSpan = document.getElementById('selected-records-count');
+                const deleteSelectedBtn = document.getElementById('btn-delete-selected-records');
+
+                if (bulkActionsContainer && selectedRecordsCountSpan && deleteSelectedBtn) { // Ensure elements exist
+                    if (count > 0) {
+                        showElement(bulkActionsContainer);
+                        selectedRecordsCountSpan.textContent = `${count} registro(s) selecionado(s)`;
+                        deleteSelectedBtn.disabled = false;
+                    } else {
+                        hideElement(bulkActionsContainer);
+                        selectedRecordsCountSpan.textContent = '';
+                        deleteSelectedBtn.disabled = true;
+                    }
+                }
+
+
+                // Update "Select All" checkbox state
+                const selectAllCheckbox = document.getElementById('select-all-records-checkbox');
+                if (selectAllCheckbox) {
+                    const visibleRecordCheckboxes = document.querySelectorAll('.record-checkbox');
+                    const allVisibleSelected = Array.from(visibleRecordCheckboxes).every(cb => cb.checked);
+                    selectAllCheckbox.checked = allVisibleSelected && visibleRecordCheckboxes.length > 0;
+                    selectAllCheckbox.indeterminate = !allVisibleSelected && count > 0;
+                }
+            };
+
+            // Function to handle the "Select All" checkbox toggle
+            const toggleSelectAllCheckboxes = (event) => {
+                const isChecked = event.target.checked;
+                document.querySelectorAll('.record-checkbox').forEach(checkbox => {
+                    checkbox.checked = isChecked;
+                    const recordId = checkbox.dataset.id;
+                    if (isChecked) {
+                        selectedRecordIds.add(recordId);
+                    } else {
+                        selectedRecordIds.delete(recordId);
+                    }
+                });
+                updateSelectedCountUI();
+            };
+
+            // Function to handle individual checkbox changes
+            const handleIndividualCheckboxChange = (event) => {
+                const recordId = event.target.dataset.id;
+                if (event.target.checked) {
+                    selectedRecordIds.add(recordId);
+                } else {
+                    selectedRecordIds.delete(recordId);
+                }
+                updateSelectedCountUI();
+            };
+
+            // Function to delete selected records
+            const deleteSelectedRecords = async () => {
+                if (selectedRecordIds.size === 0) {
+                    showNotification("Nenhum registro selecionado para exclusão.", "info");
+                    return;
+                }
+
+                const recordsToDeleteDetails = Array.from(selectedRecordIds).map(id => {
+                    const record = globalData.records.find(r => r.id === id);
+                    return record ? { id: record.id, name: `${record.eventName} (${new Date(record.eventDate + 'T00:00:00').toLocaleDateString('pt-BR')})` } : { id: id, name: `ID: ${id}` };
+                });
+                const recordsToDeleteListHtml = recordsToDeleteDetails.map(d => `<p class="text-xs font-mono">${d.name}</p>`).join('');
+
+                openModal(
+                    `Confirmar Exclusão de Registros`,
+                    `<p>Você está prestes a excluir os seguintes ${selectedRecordIds.size} registro(s):</p><div class="max-h-32 overflow-y-auto p-2 bg-gray-100 rounded-md border border-gray-200 mb-4">${recordsToDeleteListHtml}</div><p>Esta ação não pode ser desfeita. Deseja continuar?</p>`,
+                    async () => {
+                        let successfulDeletions = 0;
+                        let failedDeletions = 0;
+                        const idsActuallyDeleted = new Set(); // Track successfully deleted IDs
+
+                        // Perform deletions sequentially to await each promise
+                        for (const recordDetail of recordsToDeleteDetails) {
+                            const result = await _performDirectDelete('records', recordDetail.id, false, getCollectionRef('records', false));
+                            if (result.success) {
+                                successfulDeletions++;
+                                idsActuallyDeleted.add(recordDetail.id);
+                            } else {
+                                failedDeletions++;
+                                console.error(`Falha ao excluir registro ${recordDetail.id}:`, result.error);
+                            }
+                        }
+
+                        // Clear the selected IDs from the global set based on which ones were actually deleted
+                        // This ensures that if a deletion failed, its checkbox state can be re-evaluated
+                        selectedRecordIds.forEach(id => {
+                            if (idsActuallyDeleted.has(id)) {
+                                selectedRecordIds.delete(id);
+                            }
+                        });
+                        // Alternatively, we could just clear all selectedRecordIds and let renderApp rebuild the set.
+                        // selectedRecordIds.clear(); // If you want to clear all selections regardless of success/failure for the bulk operation.
+
+                        showNotification(`Exclusão concluída: ${successfulDeletions} sucesso(s), ${failedDeletions} falha(s).`, successfulDeletions > 0 ? 'success' : (failedDeletions > 0 ? 'error' : 'info'));
+                        renderApp(); // Re-render to update the table
+                    },
+                    'Excluir',
+                    () => { /* Cancel action */ },
+                    'Cancelar'
+                );
+            };
+
+            // Event Listeners for Filter Buttons (Delegated to filters-container)
+            const filtersContainer = document.getElementById('filters-container');
+            if (filtersContainer) {
+                document.getElementById('btn-apply-filters').addEventListener('click', applyFilters);
+                document.getElementById('btn-clear-filters').addEventListener('click', clearFilters);
+
+                // Add input listeners to update filterState immediately
+                filtersContainer.querySelectorAll('.filter-input').forEach(input => {
+                    input.addEventListener('input', (event) => {
+                        const key = filterIdToStateKey[event.target.id];
+                        if (key) {
+                            filterState[key] = event.target.value;
+                            // For select and date inputs, apply filters immediately on change
+                            if (event.target.tagName === 'SELECT' || event.target.type === 'date') {
+                                applyFilters();
+                            }
+                        }
+                    });
+                });
+            } else {
+                console.error("Filters container not found!");
+            }
+
+            // Delegated event listeners for checkboxes (since rows are dynamically rendered)
+            const recordHistoryTableContainer = document.getElementById('record-history-table-container');
+            if (recordHistoryTableContainer) {
+                recordHistoryTableContainer.addEventListener('change', (event) => {
+                    if (event.target.classList.contains('record-checkbox')) {
+                        handleIndividualCheckboxChange(event);
+                    } else if (event.target.id === 'select-all-records-checkbox') {
+                        toggleSelectAllCheckboxes(event);
+                    }
+                });
+
+                recordHistoryTableContainer.addEventListener('click', (event) => {
+                    if (event.target.classList.contains('btn-delete-record')) {
+                        const recordId = event.target.dataset.id;
+                        confirmAction(
+                            `Confirmar Exclusão`,
+                            `Tem certeza que deseja excluir este registro? Esta ação não pode ser desfeita.`,
+                            async () => {
+                                await deleteItemFromFirestore('records', recordId, false, getCollectionRef('records', false), true);
+                                // The onSnapshot listener will trigger renderApp and update UI
+                            }
+                        );
+                    }
+                });
+            } else {
+                console.error("Record history table container not found!");
+            }
+
+
+            document.getElementById('btn-back-dashboard').addEventListener('click', () => {
+                currentView = userProfile.isAdmin ? 'adminDashboard' : 'managerDashboard';
+                renderApp();
+            });
+
+            document.getElementById('btn-delete-selected-records')?.addEventListener('click', deleteSelectedRecords);
+            document.getElementById('btn-export-csv').addEventListener('click', () => exportToCSV(currentFilteredRecordsForExport));
+            document.getElementById('btn-export-xlsx').addEventListener('click', () => exportToXLSX(currentFilteredRecordsForExport));
+
+            // Initial UI update for selected count
+            updateSelectedCountUI();
+        }
+
+        // Renderiza o painel do administrador
+        function renderAdminDashboard() {
+            const adminButtonBaseClass = "flex flex-col items-center justify-center text-center p-5 bg-white hover:bg-gray-50 text-gray-700 rounded-xl transition-all duration-150 ease-in-out border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-lg";
+            const iconBaseClass = "w-8 h-8 mb-2 text-blue-600";
+
+            appContent.innerHTML = `
+                <div class="animate-fadeIn">
+                    <div class="bg-white p-6 sm:p-8 rounded-xl shadow-lg border border-gray-200 mb-8">
+                        <h2 class="text-2xl font-semibold text-gray-800 mb-1">Painel Administrativo</h2>
+                        <p class="text-gray-500 text-sm">Bem-vindo, <span class="font-medium text-gray-700">${userProfile.name}</span>. Gerencie todos os aspectos do sistema.</p>
+                    </div>
+
+                    <div class="mb-8">
+                        <h3 class="text-base font-semibold text-gray-500 mb-3 px-1">Ações Rápidas de Gestor (Admin)</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <button id="admin-btn-new-record" class="${adminButtonBaseClass}">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="${iconBaseClass}"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                                <span class="text-xs font-medium">Incluir Novo Registro</span>
+                            </button>
+                            <button id="admin-btn-import-records" class="${adminButtonBaseClass}">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="${iconBaseClass}"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                                <span class="text-xs font-medium">Importar Registros (Planilha)</span>
+                            </button>
+                            <button id="admin-btn-history" class="${adminButtonBaseClass}">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="${iconBaseClass}"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z" /></svg>
+                                <span class="text-xs font-medium">Ver Histórico Completo</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-500 mb-3 px-1">Gerenciamento do Sistema</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <button id="admin-manage-categories" class="${adminButtonBaseClass}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="${iconBaseClass}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                                <span class="text-xs font-medium">Gerenciar Categorias</span></button>
+                            <button id="admin-manage-sectors" class="${adminButtonBaseClass}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="${iconBaseClass}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                                <span class="text-xs font-medium">Gerenciar Setores</span></button>
+                            <button id="admin-manage-employees" class="${adminButtonBaseClass}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="${iconBaseClass}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                                <span class="text-xs font-medium">Gerenciar Funcionários</span></button>
+                            <button id="admin-manage-rules" class="${adminButtonBaseClass}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="${iconBaseClass}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                                <span class="text-xs font-medium">Gerenciar Regras</span></button>
+                            <button id="admin-manage-users" class="${adminButtonBaseClass}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="${iconBaseClass}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                <span class="text-xs font-medium">Gerenciar Perfis de Usuários</span></button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('admin-btn-new-record').onclick = () => { currentView = 'newRecord'; renderApp(); };
+            document.getElementById('admin-btn-import-records').onclick = () => { currentView = 'importRecords'; renderApp(); };
+            document.getElementById('admin-btn-history').onclick = () => { currentView = 'history'; renderApp(); };
+            document.getElementById('admin-manage-categories').onclick = () => { currentView = 'adminManageCategories'; renderApp(); };
+            document.getElementById('admin-manage-sectors').onclick = () => { currentView = 'adminManageSectors'; renderApp(); };
+            document.getElementById('admin-manage-employees').onclick = () => { currentView = 'adminManageEmployees'; renderApp(); };
+            document.getElementById('admin-manage-rules').onclick = () => { currentView = 'adminManageRules'; renderApp(); };
+            document.getElementById('admin-manage-users').onclick = () => { currentView = 'adminManageUsers'; renderApp(); };
+        }
+
+        // Renderiza a página genérica de gerenciamento (Categorias, Setores, Funcionários)
+        function renderAdminManageGenericPage(collectionKey, items, fields, onAdd, onUpdate, onDelete) {
+            const cdn = collectionDisplayName(collectionKey);
+            const inputBaseClass = "w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-gray-800 placeholder-gray-400 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors";
+            let itemsToDisplay = items;
+            let filtersHtml = '';
+            if (collectionKey === 'employees') {
+                const filterEmployees = () => {
+                    let data = [...items];
+                    if (employeeFilterState.searchTerm.trim()) {
+                        const term = employeeFilterState.searchTerm.trim().toLowerCase();
+                        data = data.filter(emp => (emp.name || '').toLowerCase().includes(term) || (emp.registration || '').toLowerCase().includes(term));
+                    }
+                    if (employeeFilterState.sector) {
+                        data = data.filter(emp => emp.sector === employeeFilterState.sector);
+                    }
+                    return data;
+                };
+                itemsToDisplay = filterEmployees();
+                filtersHtml = `
+                    <div id="emp-filters-container" class="filter-wrapper mb-6 space-y-3">
+                        <div class="filter-group">
+                            <label for="emp-filter-search" class="filter-label">Buscar:</label>
+                            <input type="text" id="emp-filter-search" class="filter-input" placeholder="Nome ou matrícula" value="${employeeFilterState.searchTerm}">
+                        </div>
+                        <div class="filter-group">
+                            <label for="emp-filter-sector" class="filter-label">Setor:</label>
+                            <select id="emp-filter-sector" class="filter-input">
+                                <option value="">Todos</option>
+                                ${globalData.sectors.map(s => `<option value="${s.name}" ${employeeFilterState.sector === s.name ? 'selected' : ''}>${s.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button id="emp-btn-apply-filters" class="px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Aplicar</button>
+                            <button id="emp-btn-clear-filters" class="px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg">Limpar</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const tableHeaders = fields.map(f => `<th class="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${f.label}</th>`).join('');
+            const tableRows = itemsToDisplay.map(item => `
+                <tr class="hover:bg-gray-50 transition-colors">
+                    ${fields.map(field => `<td class="px-5 py-3 text-xs text-gray-700 whitespace-nowrap">${field.type === 'date' && item[field.name] ? new Date(item[field.name] + 'T00:00:00').toLocaleDateString('pt-BR') : (item[field.name] || '-')}</td>`).join('')}
+                    <td class="px-5 py-3 text-xs text-gray-500 whitespace-nowrap">${item.createdAt?.toDate?.().toLocaleDateString('pt-BR') || '-'}</td>
+                    <td class="px-5 py-3 text-xs font-medium space-x-2.5 whitespace-nowrap">
+                        <button class="btn-edit-item text-blue-600 hover:text-blue-700 p-1 hover:bg-blue-50 rounded-md" data-id="${item.id}" title="Editar">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </button>
+                        <button class="btn-delete-item text-red-500 hover:text-red-600 p-1 hover:bg-red-50 rounded-md" data-id="${item.id}" title="Excluir">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            appContent.innerHTML = `
+                <div class="animate-fadeIn bg-white p-6 sm:p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800">Gerenciar ${cdn.plural}</h2>
+                        <div class="mt-3 sm:mt-0 flex space-x-2">
+                            <button id="btn-back-admin-dash" class="px-3 py-2 text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors">Voltar</button>
+                            <button id="btn-add-new-item" class="px-3 py-2 text-xs font-medium bg-gray-800 hover:bg-gray-900 text-white rounded-lg transition-colors flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="mr-1.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                Adicionar Novo
+                            </button>
+                        </div>
+                    </div>
+                    ${filtersHtml}
+                    ${itemsToDisplay.length === 0 ?
+                        `<div class="text-center py-10"><p class="text-gray-500 text-sm">Nenhum item em "${cdn.plural}" cadastrado.</p></div>` :
+                        `<div class="overflow-x-auto border border-gray-200 rounded-lg">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50"><tr>${tableHeaders}<th class="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Criado Em</th><th class="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th></tr></thead>
+                                <tbody class="bg-white divide-y divide-gray-200">${tableRows}</tbody>
+                            </table>
+                        </div>`
+                    }
+                </div>
+            `;
+
+            const openItemModal = (itemToEdit = null) => {
+                let formHtml = '';
+                fields.forEach(field => {
+                    const value = itemToEdit ? (itemToEdit[field.name] || '') : '';
+                    const fieldId = `field-${field.name}`;
+                    if (field.type === 'select') {
+                        const optionsHtml = field.options.map(opt => `<option value="${opt.value}" ${value === opt.value ? 'selected' : ''}>${opt.label}</option>`).join('');
+                        formHtml += `<div class="mb-4"><label for="${fieldId}" class="block text-xs font-medium text-gray-600 mb-1">${field.label}:</label><select id="${fieldId}" name="${field.name}" class="${inputBaseClass}" required><option value="">Selecione</option>${optionsHtml}</select></div>`;
+                    } else {
+                        formHtml += `<div class="mb-4"><label for="${fieldId}" class="block text-xs font-medium text-gray-600 mb-1">${field.label}:</label><input type="${field.type || 'text'}" id="${fieldId}" name="${field.name}" value="${value}" class="${inputBaseClass}" required></div>`;
+                    }
+                });
+                const modalTitle = itemToEdit ? `Editar ${cdn.singular}` : `Adicionar ${cdn.singular}`;
+
+                const asyncOperation = async () => {
+                    const formData = {};
+                    const formElement = document.getElementById('item-form');
+                    if (formElement && !formElement.checkValidity()) {
+                        showNotification("Por favor, preencha todos os campos obrigatórios.", "error");
+                        formElement.reportValidity();
+                        return Promise.reject(new Error("Formulário inválido"));
+                    }
+
+                    fields.forEach(field => {
+                        const inputElement = document.getElementById(`field-${field.name}`);
+                        if (inputElement) {
+                            formData[field.name] = inputElement.value;
+                        } else {
+                            console.warn(`Elemento do formulário não encontrado para o campo: field-${field.name}`);
+                        }
+                    });
+
+                    if (collectionKey === 'employees') {
+                        const reg = formData.registration?.trim();
+                        if (reg) {
+                            const duplicate = globalData.employees.some(emp => emp.registration === reg && emp.id !== itemToEdit?.id);
+                            if (duplicate) {
+                                showNotification('Já existe um funcionário com esta matrícula.', 'error');
+                                return Promise.reject(new Error('duplicate registration'));
+                            }
+                        }
+                    }
+
+                    if (itemToEdit) {
+                        await onUpdate(itemToEdit.id, formData);
+                    } else {
+                        await onAdd(formData);
+                    }
+                };
+
+                openModal(modalTitle,
+                    `<form id="item-form" class="space-y-1">${formHtml.replace(/class="mb-4"(?![\s\S]*class="mb-4")/g, '')}</form>`,
+                    asyncOperation,
+                    itemToEdit ? 'Salvar Alterações' : 'Adicionar'
+                );
+            };
+
+            document.getElementById('btn-add-new-item').addEventListener('click', () => openItemModal());
+            document.getElementById('btn-back-admin-dash').addEventListener('click', () => { currentView = 'adminDashboard'; renderApp(); });
+            document.querySelectorAll('.btn-edit-item').forEach(btn => btn.addEventListener('click', (e) => {
+                const itemId = e.currentTarget.dataset.id;
+                const item = items.find(i => i.id === itemId);
+                if (item) openItemModal(item);
+            }));
+            document.querySelectorAll('.btn-delete-item').forEach(btn => btn.addEventListener('click', (e) => {
+                const itemId = e.currentTarget.dataset.id;
+                deleteItemFromFirestore(collectionKey, itemId);
+            }));
+
+            if (collectionKey === 'employees') {
+                const container = document.getElementById('emp-filters-container');
+                if (container) {
+                    document.getElementById('emp-btn-apply-filters').addEventListener('click', () => {
+                        container.querySelectorAll('.filter-input').forEach(inp => {
+                            const key = employeeFilterIdToStateKey[inp.id];
+                            if (key) employeeFilterState[key] = inp.value;
+                        });
+                        renderApp();
+                    });
+                    document.getElementById('emp-btn-clear-filters').addEventListener('click', () => {
+                        employeeFilterState = { searchTerm: '', sector: '' };
+                        renderApp();
+                    });
+                }
+            }
+        }
+
+        // Renderiza a página para criar/editar perfis de usuário
+        function renderAdminCreateUserProfilePage(userToEdit = null) {
+            const isCreating = !userToEdit;
+            const cdn = collectionDisplayName('users_profile');
+            const sectorsOptionsHtml = globalData.sectors.map(s => `<option value="${s.name}" ${userToEdit?.sector === s.name ? 'selected' : ''}>${s.name}</option>`).join('');
+            const inputBaseClass = "w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-gray-800 placeholder-gray-400 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors";
+            const checkboxClass = "h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500";
+
+            const pageTitle = isCreating ? "Criar Novo Perfil de Usuário" : `Editar Perfil: ${userToEdit.name}`;
+
+            appContent.innerHTML = `
+                <div class="animate-fadeIn bg-white p-6 sm:p-8 rounded-xl shadow-lg border border-gray-200 max-w-xl mx-auto">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800">${pageTitle}</h2>
+                        <button id="btn-back-manage-users" class="px-3 py-2 text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors">Voltar para Gerenciar</button>
+                    </div>
+                    <form id="user-profile-form" class="space-y-4">
+                        ${isCreating ? '<input type="hidden" id="userProfileUid">' : `<div><label for="userProfileUid" class="block text-xs font-medium text-gray-600 mb-1">UID do Usuário (do Firebase Auth):</label><input type="text" id="userProfileUid" value="${userToEdit?.id || ''}" class="${inputBaseClass} bg-gray-100 cursor-not-allowed" readonly></div>`}
+                        <div><label for="userProfileName" class="block text-xs font-medium text-gray-600 mb-1">Nome Completo:</label>
+                             <input type="text" id="userProfileName" value="${userToEdit?.name || ''}" class="${inputBaseClass}" required></div>
+                        <div><label for="userProfileEmail" class="block text-xs font-medium text-gray-600 mb-1">Email:</label>
+                             <input type="email" id="userProfileEmail" value="${userToEdit?.email || ''}" class="${inputBaseClass}" required placeholder="email.do.usuario@example.com"></div>
+                        ${isCreating ? `<div><label for="userProfilePassword" class="block text-xs font-medium text-gray-600 mb-1">Senha Inicial:</label><input type="password" id="userProfilePassword" class="${inputBaseClass}" required></div>` : ''}
+                        <div><label for="userProfileSector" class="block text-xs font-medium text-gray-600 mb-1">Setor:</label>
+                             <select id="userProfileSector" class="${inputBaseClass}">
+                                 <option value="" ${!(userToEdit?.sector) ? 'selected': ''}>Nenhum</option>
+                                 ${sectorsOptionsHtml}
+                             </select></div>
+                        <div class="grid grid-cols-2 gap-4 pt-1">
+                            <label class="flex items-center space-x-2 text-sm text-gray-700"><input type="checkbox" id="userProfileIsManager" ${userToEdit?.isManager ? 'checked' : ''} class="${checkboxClass}"><span>É Gestor?</span></label>
+                            <label class="flex items-center space-x-2 text-sm text-gray-700"><input type="checkbox" id="userProfileIsAdmin" ${userToEdit?.isAdmin ? 'checked' : ''} class="${checkboxClass}"><span>É Admin?</span></label>
+                        </div>
+                        <div class="flex justify-end pt-4 space-x-2">
+                            <button type="submit" class="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 min-w-[120px] text-center">${isCreating ? 'Criar Perfil' : 'Salvar Alterações'}</button>
+                            ${!isCreating ? `<button type="button" id="btn-delete-user-profile" class="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1">Excluir Usuário</button>` : ''}
+                        </div>
+                    </form>
+                </div>`;
+
+            document.getElementById('btn-back-manage-users').onclick = () => { currentView = 'adminManageUsers'; renderApp(); };
+            document.getElementById('user-profile-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitButton = e.target.querySelector('button[type="submit"]');
+                const originalButtonText = submitButton.innerHTML;
+                submitButton.disabled = true;
+                submitButton.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Processando...</span>`;
+
+                let uid = document.getElementById('userProfileUid').value.trim();
+                const email = document.getElementById('userProfileEmail').value.trim();
+
+                if (isCreating) {
+                    const pwd = document.getElementById('userProfilePassword').value;
+                    if (!pwd || pwd.length < 6) {
+                        showNotification('A senha deve ter pelo menos 6 caracteres.', 'error');
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalButtonText;
+                        return;
+                    }
+                    try {
+                        uid = await createAuthUser(email, pwd);
+                        document.getElementById('userProfileUid').value = uid;
+                    } catch (error) {
+                        console.error('Erro ao criar usuário Auth:', error);
+                        showNotification('Erro ao criar usuário: ' + error.message, 'error');
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalButtonText;
+                        return;
+                    }
+                } else {
+                    if (!uid) {
+                        showNotification("O UID do Usuário é obrigatório.", "error");
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalButtonText;
+                        return;
+                    }
+                }
+
+                const profileData = {
+                    name: document.getElementById('userProfileName').value,
+                    email: email,
+                    sector: document.getElementById('userProfileSector').value,
+                    isManager: document.getElementById('userProfileIsManager').checked,
+                    isAdmin: document.getElementById('userProfileIsAdmin').checked,
+                    uid: uid
+                };
+
+                try {
+                    const userDocRef = doc(getCollectionRef('users_profile', false), uid);
+                    // setDoc com { merge: true } para atualizar ou criar se não existir
+                    await setDoc(userDocRef, profileData, { merge: !isCreating });
+                    showNotification(`Perfil de usuário ${isCreating ? 'criado' : 'atualizado'} com sucesso!`, "success");
+                    currentView = 'adminManageUsers';
+                    renderApp();
+                } catch (error) {
+                    showNotification(`Erro ao ${isCreating ? 'criar' : 'atualizar'} perfil. Detalhes no console.`, "error");
+                    console.error(`Erro ao salvar perfil de usuário ${uid}:`, error);
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonText;
+                }
+            });
+            if (!isCreating) {
+                document.getElementById('btn-delete-user-profile').addEventListener('click', () => {
+                    const uid = document.getElementById('userProfileUid').value.trim();
+                    if (uid) deleteUserCompletely(uid);
+                });
+            }
+        }
+
+
+        // Renderiza a página de gerenciamento de usuários (apenas para admin)
+        function renderAdminManageUsersPage() {
+            const users = globalData.allUsers;
+            const cdn = collectionDisplayName('users_profile');
+
+            const tableRows = users.map(user => `
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-5 py-3 text-xs text-gray-700 font-medium whitespace-nowrap">${user.name || 'N/A'}</td>
+                    <td class="px-5 py-3 text-xs text-gray-600 whitespace-nowrap">${user.email}</td>
+                    <td class="px-5 py-3 text-xs text-gray-600 whitespace-nowrap">${user.sector || 'N/A'}</td>
+                    <td class="px-5 py-3 text-xs text-gray-600 whitespace-nowrap">${user.isManager ? '<span class="px-2 py-0.5 inline-flex text-xxs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Sim</span>' : '<span class="px-2 py-0.5 inline-flex text-xxs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Não</span>'}</td>
+                    <td class="px-5 py-3 text-xs text-gray-600 whitespace-nowrap">${user.isAdmin ? '<span class="px-2 py-0.5 inline-flex text-xxs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Sim</span>' : '<span class="px-2 py-0.5 inline-flex text-xxs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Não</span>'}</td>
+                    <td class="px-5 py-3 text-xs font-medium whitespace-nowrap space-x-2">
+                        <button class="btn-edit-user text-blue-600 hover:text-blue-700 p-1 hover:bg-blue-50 rounded-md" data-id="${user.id}" title="Editar Usuário">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </button>
+                        <button class="btn-delete-user text-red-500 hover:text-red-600 p-1 hover:bg-red-50 rounded-md" data-id="${user.id}" title="Excluir Usuário">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            appContent.innerHTML = `
+                <div class="animate-fadeIn bg-white p-6 sm:p-8 rounded-xl shadow-lg border border-gray-200">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800">Gerenciar Perfis de Usuários</h2>
+                        <div class="mt-3 sm:mt-0 flex space-x-2">
+                            <button id="btn-back-admin-dash-users" class="px-3 py-2 text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors">Voltar</button>
+                            <button id="btn-add-new-user-profile" class="px-3 py-2 text-xs font-medium bg-gray-800 hover:bg-gray-900 text-white rounded-lg transition-colors flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="mr-1.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                Adicionar Novo Perfil
+                            </button>
+                        </div>
+                    </div>
+                    ${users.length === 0 ?
+                        `<div class="text-center py-10"><p class="text-gray-500 text-sm">Nenhum perfil de usuário encontrado.</p></div>` :
+                        `<div class="overflow-x-auto border border-gray-200 rounded-lg">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50"><tr>
+                                    <th class="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                                    <th class="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                    <th class="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Setor</th>
+                                    <th class="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gestor?</th>
+                                    <th class="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin?</th>
+                                    <th class="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                                </tr></thead>
+                                <tbody class="bg-white divide-y divide-gray-200">${tableRows}</tbody>
+                            </table>
+                        </div>`
+                    }
+                </div>
+            `;
+
+            document.getElementById('btn-add-new-user-profile').addEventListener('click', () => {
+                currentView = 'adminCreateUserProfile';
+                renderApp();
+            });
+            document.getElementById('btn-back-admin-dash-users').addEventListener('click', () => { currentView = 'adminDashboard'; renderApp(); });
+            document.querySelectorAll('.btn-edit-user').forEach(btn => btn.addEventListener('click', (e) => {
+                const userId = e.currentTarget.dataset.id;
+                const userToEdit = users.find(u => u.id === userId);
+                if(userToEdit) {
+                    renderAdminCreateUserProfilePage(userToEdit);
+                }
+            }));
+            document.querySelectorAll('.btn-delete-user').forEach(btn => btn.addEventListener('click', (e) => {
+                const userId = e.currentTarget.dataset.id;
+                deleteUserCompletely(userId);
+            }));
+        }
+
+        // --- Funções de Exportação ---
+        // Exporta dados para CSV
+        function exportToCSV(records) {
+            if (!records || records.length === 0) {
+                showNotification("Nenhum dado para exportar.", "info"); return;
+            }
+            const headers = ["Data Criação", "Evento", "Data Evento", "Categoria", "Funcionário", "Setor", "Gestor Lançador", "Observações"];
+            let csvContent = headers.join(",") + "\\n";
+
+            records.forEach(record => {
+                const row = [
+                    record.createdAt?.toDate?.().toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}) || 'N/A',
+                    `"${(record.eventName || 'N/A').replace(/"/g, '""')}"`,
+                    record.eventDate ? new Date(record.eventDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A',
+                    `"${(record.categoryName || 'N/A').replace(/"/g, '""')}"`,
+                    `"${(record.employeeName || 'N/A').replace(/"/g, '""')}"`,
+                    `"${(record.sector || 'N/A').replace(/"/g, '""')}"`,
+                    `"${(record.managerName || 'N/A').replace(/"/g, '""')}"`,
+                    `"${(record.notes || '-').replace(/"/g, '""')}"`
+                ];
+                csvContent += row.join(",") + "\\n";
+            });
+
+            const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "historico_registros.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showNotification("CSV exportado com sucesso!", "success");
+        }
+
+        // Exporta dados para XLSX
+        function exportToXLSX(records) {
+            if (typeof XLSX === 'undefined') {
+                showNotification("Erro: Biblioteca de exportação XLSX não carregada.", "error");
+                console.error("XLSX library (SheetJS) not found. Make more details in console");
+                return;
+            }
+            if (!records || records.length === 0) {
+                showNotification("Nenhum dado para exportar.", "info"); return;
+            }
+
+            const dataForSheet = records.map(record => ({
+                "Data Criação": record.createdAt?.toDate?.().toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}) || 'N/A',
+                "Evento": record.eventName || 'N/A',
+                "Data Evento": record.eventDate ? new Date(record.eventDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A',
+                "Categoria": record.categoryName || 'N/A',
+                "Funcionário": record.employeeName || 'N/A',
+                "Setor": record.sector || 'N/A',
+                "Gestor Lançador": record.managerName || 'N/A',
+                "Observações": record.notes || '-'
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Histórico");
+            XLSX.writeFile(workbook, "historico_registros.xlsx");
+            showNotification("XLSX exportado com sucesso!", "success");
+        }
+
+
+        // Garante que o login inicial seja tentado ao carregar a página
+        document.addEventListener('DOMContentLoaded', () => {
+            performInitialSignIn();
+        });
+
+    </script>
+</body>
+</html>

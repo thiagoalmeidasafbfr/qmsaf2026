@@ -1,0 +1,11 @@
+{
+  "name": "qmsafbotafogo",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tailwindcss -i ./src/input.css -o ./tailwind.css --minify",
+    "test": "node -e \"console.log('No tests specified')\""
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.1"
+  }
+}
