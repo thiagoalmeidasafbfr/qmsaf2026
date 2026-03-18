@@ -205,13 +205,12 @@
         // A chave de API do Firebase é pública e projetada para ser incluída no código do cliente.
         // As regras de segurança do Firestore (configuradas separadamente) são responsáveis por proteger seus dados.
         const firebaseConfigFromUser = {
-            apiKey: "AIzaSyDkRi6GWPiVawTe607frndhUbfB77yfVOw",
-            authDomain: "qmsafbotafogo.firebaseapp.com",
-            databaseURL: "https://qmsafbotafogo-default-rtdb.firebaseio.com",
-            projectId: "qmsafbotafogo",
-            storageBucket: "qmsafbotafogo.firebasestorage.app",
-            messagingSenderId: "447753167474",
-            appId: "1:447753167474:web:7706e7a5c78b4127a058eb"
+            apiKey: "AIzaSyCOYiv2_MxDQBwO-6TJHUPqdDSqF9IwTt0",
+            authDomain: "qmsaf2026.firebaseapp.com",
+            projectId: "qmsaf2026",
+            storageBucket: "qmsaf2026.firebasestorage.app",
+            messagingSenderId: "512208158754",
+            appId: "1:512208158754:web:3d51f601b0132b0ecc4a7b"
         };
 
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfigFromUser;
@@ -465,9 +464,16 @@
                 showNotification("Login bem-sucedido!", "success");
             } catch (error) {
                 console.error("Erro no login:", error);
-                showNotification(error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential'
-                    ? "Email ou senha inválidos."
-                    : `Erro ao fazer login: ${error.message} (código: ${error.code})`, "error");
+                const loginErrorMessages = {
+                    'auth/user-not-found': 'Usuário não encontrado.',
+                    'auth/wrong-password': 'Senha incorreta.',
+                    'auth/invalid-credential': 'Email ou senha inválidos.',
+                    'auth/invalid-email': 'Email inválido.',
+                    'auth/user-disabled': 'Conta desativada. Contate o administrador.',
+                    'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
+                    'auth/network-request-failed': 'Falha de conexão. Verifique sua internet.'
+                };
+                showNotification(loginErrorMessages[error.code] || `Erro ao fazer login: ${error.message}`, "error");
                 renderApp();
             }
         }
@@ -904,8 +910,8 @@
         // --- RENDERIZAÇÃO DAS VIEWS ---
         // Função principal para renderizar a view atual
         function renderApp() {
-            if (!currentUser && currentView !== 'login' && currentView !== 'firstAccess') {
-                // Se não há usuário logado e não está nas telas de login/primeiro acesso, redireciona para login
+            if (!currentUser && currentView !== 'login' && currentView !== 'firstAccess' && currentView !== 'setup') {
+                // Se não há usuário logado e não está nas telas de login/primeiro acesso/setup, redireciona para login
                 currentView = 'login';
             }
 
@@ -918,6 +924,7 @@
 
             switch (currentView) {
                 case 'login': renderLoginPage(); break;
+                case 'setup': renderSetupPage(); break; // Configuração inicial do sistema
                 case 'firstAccess': renderFirstAccessPage(); break; // Nova tela de primeiro acesso
                 case 'changePassword': renderChangePasswordPage(); break; // Nova tela de redefinição de senha
                 case 'managerDashboard': renderManagerDashboard(); break;
@@ -1006,6 +1013,9 @@
                             <div class="text-center mt-4 text-xs">
                                 <a href="#" id="first-access-link" class="text-blue-600 hover:text-blue-700 hover:underline">Primeiro acesso ou esqueceu sua senha?</a>
                             </div>
+                            <div class="text-center mt-2 text-xs border-t border-gray-100 pt-3">
+                                <a href="#" id="setup-link" class="text-gray-400 hover:text-gray-600 hover:underline">Configurar sistema (setup inicial)</a>
+                            </div>
                         </form>
                     </div>
                     <footer class="text-center p-6 mt-8 text-gray-500 text-xs">
@@ -1022,6 +1032,11 @@
             document.getElementById('first-access-link').addEventListener('click', (e) => {
                 e.preventDefault();
                 currentView = 'firstAccess';
+                renderApp();
+            });
+            document.getElementById('setup-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                currentView = 'setup';
                 renderApp();
             });
         }
@@ -1083,6 +1098,140 @@
             });
         }
 
+        // Página de configuração inicial do sistema — criação do primeiro administrador
+        async function renderSetupPage() {
+            const inputBaseClass = "w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-400 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all";
+
+            // Verifica se já existem perfis de admin cadastrados
+            let systemAlreadyConfigured = false;
+            try {
+                const usersRef = getCollectionRef('users_profile', false);
+                const snap = await getDocs(query(usersRef));
+                systemAlreadyConfigured = snap.docs.some(d => d.data().isAdmin === true);
+            } catch (_) {
+                // Se a leitura falhar por regras de segurança, assume que pode estar vazio
+            }
+
+            if (systemAlreadyConfigured) {
+                appContent.innerHTML = `
+                    <div class="flex flex-col items-center justify-center min-h-[calc(100vh-120px)] p-4 animate-fadeIn">
+                        <div class="w-full max-w-sm bg-white shadow-xl rounded-xl p-8 border border-gray-200 text-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4 text-green-500" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" /></svg>
+                            <h2 class="text-xl font-semibold text-gray-800 mb-2">Sistema já configurado</h2>
+                            <p class="text-gray-500 text-sm mb-6">Já existem administradores cadastrados. Use o login normal para acessar o sistema.</p>
+                            <button id="back-to-login-configured" class="w-full px-4 py-2.5 text-sm bg-gray-800 hover:bg-gray-900 text-white font-medium rounded-lg transition-colors">Ir para o Login</button>
+                        </div>
+                    </div>`;
+                document.getElementById('back-to-login-configured').addEventListener('click', () => { currentView = 'login'; renderApp(); });
+                return;
+            }
+
+            appContent.innerHTML = `
+                <div class="flex flex-col items-center justify-center min-h-[calc(100vh-120px)] p-4 animate-fadeIn">
+                    <div class="w-full max-w-sm bg-white shadow-xl rounded-xl p-8 border border-gray-200">
+                        <div class="flex flex-col items-center mb-6">
+                            <img src="favicon.png" alt="Logo Botafogo" class="h-16 w-16 rounded-lg mb-4">
+                            <h2 class="text-2xl font-semibold text-gray-800 text-center">Configuração Inicial</h2>
+                            <p class="text-gray-500 mt-1 text-sm text-center">Crie o primeiro administrador do sistema.</p>
+                        </div>
+                        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-5">
+                            <p class="text-xs text-amber-700"><strong>Atenção:</strong> Esta página cria o administrador principal. Após o primeiro admin ser criado, este acesso será bloqueado automaticamente.</p>
+                        </div>
+                        <form id="setup-form" class="space-y-4">
+                            <div>
+                                <label for="setupName" class="block text-xs font-medium text-gray-600 mb-1">Nome Completo</label>
+                                <input id="setupName" type="text" required class="${inputBaseClass}" placeholder="Seu nome completo">
+                            </div>
+                            <div>
+                                <label for="setupEmail" class="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                                <input id="setupEmail" type="email" required class="${inputBaseClass}" placeholder="admin@safbfr.com.br">
+                            </div>
+                            <div>
+                                <label for="setupPassword" class="block text-xs font-medium text-gray-600 mb-1">Senha</label>
+                                <input id="setupPassword" type="password" required minlength="6" class="${inputBaseClass}" placeholder="Mínimo 6 caracteres">
+                            </div>
+                            <div>
+                                <label for="setupPasswordConfirm" class="block text-xs font-medium text-gray-600 mb-1">Confirmar Senha</label>
+                                <input id="setupPasswordConfirm" type="password" required minlength="6" class="${inputBaseClass}" placeholder="Repita a senha">
+                            </div>
+                            <button type="submit" class="w-full flex items-center justify-center text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-150 ease-in-out shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1">
+                                Criar Administrador
+                            </button>
+                            <div class="text-center mt-2 text-xs">
+                                <a href="#" id="back-to-login-setup" class="text-blue-600 hover:text-blue-700 hover:underline">Voltar para o Login</a>
+                            </div>
+                        </form>
+                    </div>
+                    <footer class="text-center p-6 mt-8 text-gray-500 text-xs">
+                        © ${new Date().getFullYear()} SAF Botafogo. Todos os direitos reservados.
+                    </footer>
+                </div>
+            `;
+
+            document.getElementById('back-to-login-setup').addEventListener('click', (e) => {
+                e.preventDefault();
+                currentView = 'login';
+                renderApp();
+            });
+
+            document.getElementById('setup-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const name = document.getElementById('setupName').value.trim();
+                const email = document.getElementById('setupEmail').value.trim();
+                const password = document.getElementById('setupPassword').value;
+                const passwordConfirm = document.getElementById('setupPasswordConfirm').value;
+                const submitButton = e.target.querySelector('button[type="submit"]');
+                const originalContent = submitButton.innerHTML;
+
+                if (password !== passwordConfirm) {
+                    showNotification('As senhas não conferem.', 'error');
+                    return;
+                }
+                if (password.length < 6) {
+                    showNotification('A senha deve ter pelo menos 6 caracteres.', 'error');
+                    return;
+                }
+
+                submitButton.disabled = true;
+                submitButton.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Criando administrador...</span>`;
+
+                try {
+                    // Cria o usuário no Firebase Auth via app secundária (sem deslogar ninguém)
+                    const uid = await createAuthUser(email, password);
+
+                    // Faz login com as credenciais recém criadas para poder escrever no Firestore
+                    await signInWithEmailAndPassword(auth, email, password);
+
+                    // Cria o perfil admin no Firestore (autenticado como o novo usuário)
+                    const userDocRef = doc(getCollectionRef('users_profile', false), uid);
+                    await setDoc(userDocRef, {
+                        name,
+                        email,
+                        sector: '',
+                        isManager: true,
+                        isAdmin: true,
+                        uid,
+                        createdAt: Timestamp.now()
+                    });
+
+                    showNotification('Administrador criado com sucesso! Bem-vindo ao sistema.', 'success');
+                    // onAuthStateChanged cuidará da navegação para o painel admin
+                } catch (error) {
+                    console.error('[renderSetupPage] Erro ao criar admin:', error);
+                    const msg = error.code === 'auth/email-already-in-use'
+                        ? 'Este email já está em uso. Tente o login normal.'
+                        : error.code === 'auth/weak-password'
+                        ? 'Senha muito fraca. Use pelo menos 6 caracteres.'
+                        : error.code === 'auth/invalid-email'
+                        ? 'Email inválido.'
+                        : `Erro ao criar administrador: ${error.message}`;
+                    showNotification(msg, 'error');
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalContent;
+                }
+            });
+        }
+
         // Nova página para redefinição de senha direta
         function renderChangePasswordPage() {
             const inputBaseClass = "w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-800 placeholder-gray-400 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors";
@@ -1117,7 +1266,7 @@
 
             document.getElementById('change-password-form').addEventListener('submit', handleChangePassword);
             document.getElementById('back-to-dashboard-change-password').addEventListener('click', () => {
-                currentView = 'changePassword';
+                currentView = userProfile?.isAdmin ? 'adminDashboard' : 'managerDashboard';
                 renderApp();
             });
         }
@@ -2331,7 +2480,10 @@
                              <input type="text" id="userProfileName" value="${userToEdit?.name || ''}" class="${inputBaseClass}" required></div>
                         <div><label for="userProfileEmail" class="block text-xs font-medium text-gray-600 mb-1">Email:</label>
                              <input type="email" id="userProfileEmail" value="${userToEdit?.email || ''}" class="${inputBaseClass}" required placeholder="email.do.usuario@example.com"></div>
-                        ${isCreating ? `<div><label for="userProfilePassword" class="block text-xs font-medium text-gray-600 mb-1">Senha Inicial:</label><input type="password" id="userProfilePassword" class="${inputBaseClass}" required></div>` : ''}
+                        ${isCreating ? `
+                        <div><label for="userProfilePassword" class="block text-xs font-medium text-gray-600 mb-1">Senha Inicial:</label><input type="password" id="userProfilePassword" class="${inputBaseClass}" required placeholder="Mínimo 6 caracteres"></div>
+                        <div><label for="userProfilePasswordConfirm" class="block text-xs font-medium text-gray-600 mb-1">Confirmar Senha:</label><input type="password" id="userProfilePasswordConfirm" class="${inputBaseClass}" required placeholder="Repita a senha"></div>
+                        ` : ''}
                         <div><label for="userProfileSector" class="block text-xs font-medium text-gray-600 mb-1">Setor:</label>
                              <select id="userProfileSector" class="${inputBaseClass}">
                                  <option value="" ${!(userToEdit?.sector) ? 'selected': ''}>Nenhum</option>
@@ -2361,8 +2513,15 @@
 
                 if (isCreating) {
                     const pwd = document.getElementById('userProfilePassword').value;
+                    const pwdConfirm = document.getElementById('userProfilePasswordConfirm').value;
                     if (!pwd || pwd.length < 6) {
                         showNotification('A senha deve ter pelo menos 6 caracteres.', 'error');
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalButtonText;
+                        return;
+                    }
+                    if (pwd !== pwdConfirm) {
+                        showNotification('As senhas não conferem.', 'error');
                         submitButton.disabled = false;
                         submitButton.innerHTML = originalButtonText;
                         return;
@@ -2372,7 +2531,13 @@
                         document.getElementById('userProfileUid').value = uid;
                     } catch (error) {
                         console.error('Erro ao criar usuário Auth:', error);
-                        showNotification('Erro ao criar usuário: ' + error.message, 'error');
+                        const createUserErrors = {
+                            'auth/email-already-in-use': 'Este email já está em uso por outra conta.',
+                            'auth/invalid-email': 'Email inválido.',
+                            'auth/weak-password': 'Senha muito fraca. Use pelo menos 6 caracteres.',
+                            'auth/operation-not-allowed': 'Operação não permitida. Contate o suporte.'
+                        };
+                        showNotification(createUserErrors[error.code] || 'Erro ao criar usuário: ' + error.message, 'error');
                         submitButton.disabled = false;
                         submitButton.innerHTML = originalButtonText;
                         return;
