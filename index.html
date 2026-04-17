@@ -353,7 +353,7 @@
             const dayOfWeek = dateObj.getDay(); // 0=Dom, 6=Sáb
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
             const [hours, minutes] = gameTime.split(':').map(Number);
-            const isAfter21 = hours > 21 || (hours === 21 && minutes > 0);
+            const isAfter21 = hours >= 21; // 21:00 inclusive = A/B
             if (isWeekend || isAfter21) {
                 return qmType === 'A' ? { classification: 'A', value: 400 } : { classification: 'B', value: 200 };
             } else {
@@ -2134,7 +2134,10 @@
                             }
 
                             const qmTypeRaw = (record["Tipo QM"] || '').trim().toUpperCase();
-                            const qmType = qmTypeRaw === 'A' ? 'A' : 'B';
+                            if (qmTypeRaw !== 'A' && qmTypeRaw !== 'B') {
+                                throw new Error(`Tipo QM "${qmTypeRaw || '(vazio)'}" inválido. Use apenas "A" ou "B".`);
+                            }
+                            const qmType = qmTypeRaw; // 'A' ou 'B'
                             const qmResult = computeQMClassification(qmType, eventDate, gameTime);
 
                             const dataToSave = {
