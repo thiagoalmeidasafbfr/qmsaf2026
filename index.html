@@ -2090,14 +2090,12 @@
                             }
 
                             // --- Data: aceita Date (cellDates), número serial ou string DD/MM/AAAA / AAAA-MM-DD ---
-                            // SheetJS cria Date com data LOCAL = data do Excel — usar getFullYear/getMonth/getDate
                             let eventDate;
                             const rawDate = record["Data do Evento"];
-                            if (rawDate instanceof Date && !isNaN(rawDate)) {
-                                const y = rawDate.getFullYear();
-                                const m = String(rawDate.getMonth() + 1).padStart(2, '0');
-                                const d = String(rawDate.getDate()).padStart(2, '0');
-                                eventDate = `${y}-${m}-${d}`;
+                            if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
+                                // toISOString() retorna a data UTC que corresponde ao serial do Excel
+                                // Em UTC-3 o SheetJS cria Date em UTC midnight, então toISOString dá a data correta
+                                eventDate = rawDate.toISOString().split('T')[0];
                             } else if (typeof rawDate === 'number') {
                                 const dateObj = XLSX.SSF.parse_date_code(rawDate);
                                 eventDate = `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
@@ -2112,6 +2110,10 @@
                                 } else {
                                     throw new Error(`Formato de data inválido: "${eventDateRaw}". Use DD/MM/AAAA ou AAAA-MM-DD.`);
                                 }
+                            }
+
+                            if (eventDate && isNaN(new Date(eventDate + 'T00:00:00').getTime())) {
+                                throw new Error(`Data inválida: "${eventDate}" (valor original: ${String(rawDate)})`);
                             }
 
                             if (!eventName || !eventDate || !gameTime || !employeeName) {
