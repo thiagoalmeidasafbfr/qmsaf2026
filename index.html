@@ -1011,11 +1011,13 @@
                 return Promise.reject(new Error("Acesso negado"));
             }
             try {
-                const { error } = await supabase.from(tableName).insert(toDB(data));
+                const payload = { ...toDB(data), created_by: currentUser?.id };
+                const { error } = await supabase.from(tableName).insert(payload);
                 if (error) throw error;
                 showNotification(`${collectionDisplayName(tableName).singular} adicionado com sucesso!`, "success");
             } catch (e) {
-                showNotification(`Erro ao adicionar ${collectionDisplayName(tableName).singular}.`, "error");
+                const msg = e?.message || e?.details || JSON.stringify(e);
+                showNotification(`Erro ao adicionar ${collectionDisplayName(tableName).singular}: ${msg}`, "error", 8000);
                 console.error(`[addItemToFirestore] ${tableName}:`, e);
                 throw e;
             }
