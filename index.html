@@ -6,8 +6,8 @@
     <title>Portal Quadro Móvel - Botafogo</title>
     <!-- Sugestão de Segurança: Considere implementar uma Content Security Policy (CSP)
          no seu servidor web para mitigar ataques de Cross-Site Scripting (XSS) e injeção de dados.
-         Exemplo (inclua no cabeçalho HTTP do servidor ou como meta tag se souber o impacto):
-         <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://www.gstatic.com; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://placehold.co; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com; style-src-elem 'self' https://fonts.googleapis.com 'unsafe-inline';">
+         Exemplo para Supabase (adapte ao seu ambiente):
+         <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; style-src-elem 'self' https://fonts.googleapis.com 'unsafe-inline';">
          A configuração acima é um exemplo e deve ser adaptada cuidadosamente ao seu ambiente.
     -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -314,58 +314,11 @@
     </div>
 
     <script type="module">
-        import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import {
-            getAuth,
-            signInWithEmailAndPassword,
-            signOut,
-            onAuthStateChanged,
-            signInAnonymously,
-            signInWithCustomToken,
-            sendPasswordResetEmail,
-            reauthenticateWithCredential, // Importar para reautenticação
-            EmailAuthProvider,          // Importar para criar credencial
-            updatePassword,             // Importar para atualizar a senha
-            createUserWithEmailAndPassword
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import {
-            getFirestore,
-            doc,
-            getDoc,
-            setDoc,
-            addDoc,
-            collection,
-            query,
-            where,
-            getDocs,
-            Timestamp,
-            deleteDoc,
-            updateDoc,
-            onSnapshot
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-        // Configuração do Firebase, usando a variável global se disponível, caso contrário, a configuração padrão.
-        // A chave de API do Firebase é pública e projetada para ser incluída no código do cliente.
-        // As regras de segurança do Firestore (configuradas separadamente) são responsáveis por proteger seus dados.
-        const firebaseConfigFromUser = {
-            apiKey: "AIzaSyCOYiv2_MxDQBwO-6TJHUPqdDSqF9IwTt0",
-            authDomain: "qmsaf2026.firebaseapp.com",
-            projectId: "qmsaf2026",
-            storageBucket: "qmsaf2026.firebasestorage.app",
-            messagingSenderId: "512208158754",
-            appId: "1:512208158754:web:3d51f601b0132b0ecc4a7b"
-        };
-
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfigFromUser;
-
-        // currentAppId define o caminho dos dados no Firestore (artifacts/{currentAppId}/...).
-        // Os dados foram importados do projeto anterior (qmsafbotafogo), então o caminho permanece o mesmo.
-        const currentAppId = 'qmsafbotafogo';
-
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        const SUPABASE_URL = 'https://vgcyrzhpsuoydissygfk.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnY3lyemhwc3VveWRpc3N5Z2ZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NDU3OTgsImV4cCI6MjA5MjAyMTc5OH0.dJE8XAp8DtpzI97jjGA7jeVLAgD7abcC20uzbSbHHRg';
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // Categorias fixas de jogo
         const GAME_CATEGORIES = [
@@ -411,7 +364,6 @@
         const modalContainer = document.getElementById('modal-container');
         const modalContent = document.getElementById('modal-content');
         const notificationContainer = document.getElementById('notification-container');
-        const deleteUserEndpoint = typeof __delete_user_url !== 'undefined' ? __delete_user_url : null;
 
         let currentUser = null;
         let userProfile = null;
@@ -422,8 +374,9 @@
         let unsubscribers = [];
         let currentFilteredRecordsForExport = [];
         let selectedRecordIds = new Set(); // Global set to store selected record IDs for bulk deletion
-        // Placeholder; actual implementation set when history view is rendered
+        // Placeholders; actual implementations set when history view is rendered
         let updateSelectedCountUI = () => {};
+        let applyFilters = () => {};
 
         // Global filter state object
         let filterState = {
@@ -562,28 +515,73 @@
             openModal(title, `<p>${message}</p>`, onConfirmAsync, 'Confirmar', () => {}, 'Cancelar');
         }
 
-        // Cria um usuário no Firebase Auth usando uma instância secundária
-        async function createAuthUser(email, password) {
-            const tempApp = initializeApp(firebaseConfig, 'temp-' + Date.now());
-            const tempAuth = getAuth(tempApp);
-            const cred = await createUserWithEmailAndPassword(tempAuth, email, password);
-            await signOut(tempAuth);
-            await deleteApp(tempApp);
-            return cred.user.uid;
+        // --- Transformação de dados Supabase ↔ App ---
+        // snake_case → camelCase
+        function snakeToCamel(s) {
+            return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+        }
+        // camelCase → snake_case
+        function camelToSnake(s) {
+            return s.replace(/[A-Z]/g, c => '_' + c.toLowerCase());
+        }
+        // Converte linha do banco (snake_case) para objeto app (camelCase),
+        // envolvendo timestamps em objetos com .toDate() para compatibilidade.
+        function fromDB(row) {
+            if (!row) return null;
+            const out = {};
+            for (const [k, v] of Object.entries(row)) {
+                const ck = snakeToCamel(k);
+                if ((k === 'created_at' || k === 'updated_at') && v) {
+                    out[ck] = { toDate: () => new Date(v), toString: () => v };
+                } else {
+                    out[ck] = v;
+                }
+            }
+            return out;
+        }
+        // Converte objeto app (camelCase) para linha do banco (snake_case),
+        // ignorando o id e timestamps já controlados pelo banco.
+        function toDB(obj) {
+            if (!obj) return null;
+            const out = {};
+            for (const [k, v] of Object.entries(obj)) {
+                if (k === 'id') continue;
+                if (v && typeof v.toDate === 'function') continue; // pula timestamps
+                out[camelToSnake(k)] = v;
+            }
+            return out;
         }
 
-        // Listener de autenticação do Firebase
-        onAuthStateChanged(auth, async (firebaseUser) => {
+        // Cria um usuário no Supabase Auth usando instância secundária
+        // (não afeta a sessão atual do admin)
+        async function createAuthUser(email, password) {
+            const tmp = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            const { data, error } = await tmp.auth.signUp({ email, password });
+            if (error) throw error;
+            const uid = data.user.id;
+            await tmp.auth.signOut();
+            return uid;
+        }
+
+        // Listener de autenticação do Supabase
+        supabase.auth.onAuthStateChange(async (event, session) => {
+            // Ignora eventos de recuperação de senha (tratados separadamente)
+            if (event === 'PASSWORD_RECOVERY') return;
+
             hideElement(initialLoadingDiv);
-            currentUser = firebaseUser;
-            if (firebaseUser) {
+
+            if (session?.user) {
+                // Shim de compatibilidade: expõe .uid igual ao Firebase
+                currentUser = { ...session.user, uid: session.user.id };
                 try {
-                    console.log(`[onAuthStateChanged] Tentando buscar perfil. UID: ${firebaseUser.uid}, currentAppId: ${currentAppId}`);
-                    const userDocRef = doc(db, 'artifacts', currentAppId, 'users_profile', firebaseUser.uid);
-                    const userDocSnap = await getDoc(userDocRef);
-                    if (userDocSnap.exists()) {
-                        userProfile = { id: userDocSnap.id, ...userDocSnap.data() };
-                        console.log("[onAuthStateChanged] Perfil do usuário encontrado:", userProfile);
+                    const { data: profileData, error } = await supabase
+                        .from('users_profile')
+                        .select('*')
+                        .eq('id', session.user.id)
+                        .single();
+
+                    if (profileData && !error) {
+                        userProfile = fromDB(profileData);
                         updateHeaderUI();
                         showElement(appHeader);
                         showElement(appFooter);
@@ -591,21 +589,23 @@
                         else if (userProfile.isManager) currentView = 'managerDashboard';
                         else {
                             showNotification("Usuário não possui perfil de gestor ou admin.", "error");
-                            currentView = 'login';
                             await handleLogout();
+                            return;
                         }
                         loadAllData();
                     } else {
                         showNotification("Perfil do usuário não encontrado. Contacte o administrador.", "error");
-                        console.warn(`[onAuthStateChanged] Perfil não encontrado para UID: ${firebaseUser.uid} no caminho artifacts/${currentAppId}/users_profile/`);
                         await handleLogout();
+                        return;
                     }
-                } catch (error) {
-                    console.error("[onAuthStateChanged] Erro ao buscar perfil:", error);
+                } catch (err) {
+                    console.error("[onAuthStateChange] Erro ao buscar perfil:", err);
                     showNotification("Erro ao carregar perfil. Tente novamente.", "error");
                     await handleLogout();
+                    return;
                 }
             } else {
+                currentUser = null;
                 userProfile = null;
                 hideElement(appHeader);
                 hideElement(appFooter);
@@ -615,38 +615,21 @@
             renderApp();
         });
 
-        // Função para realizar o sign-in inicial com token customizado (do ambiente Canvas) ou anonimamente
-        async function performInitialSignIn() {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    console.log("Nenhum token de autenticação inicial. Aguardando login do usuário.");
-                }
-            } catch (error) {
-                console.error("Erro no signInWithCustomToken:", error);
-                showNotification("Falha na autenticação inicial.", "error");
-            }
-        }
-
         // Função para lidar com o login de email/senha
         async function handleLogin(email, password) {
             appContent.innerHTML = `<div class="flex flex-col justify-center items-center h-64"><div class="loader"></div><p class="ml-3 text-gray-600 mt-3">Entrando...</p></div>`;
             try {
-                await signInWithEmailAndPassword(auth, email, password);
+                const { error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
                 showNotification("Login bem-sucedido!", "success");
             } catch (error) {
-                console.error("Erro no login:", error);
-                const loginErrorMessages = {
-                    'auth/user-not-found': 'Usuário não encontrado.',
-                    'auth/wrong-password': 'Senha incorreta.',
-                    'auth/invalid-credential': 'Email ou senha inválidos.',
-                    'auth/invalid-email': 'Email inválido.',
-                    'auth/user-disabled': 'Conta desativada. Contate o administrador.',
-                    'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
-                    'auth/network-request-failed': 'Falha de conexão. Verifique sua internet.'
+                const msgs = {
+                    'Invalid login credentials': 'Email ou senha inválidos.',
+                    'Email not confirmed': 'Email não confirmado. Verifique sua caixa de entrada.',
+                    'User not found': 'Usuário não encontrado.',
+                    'Too many requests': 'Muitas tentativas. Aguarde alguns minutos.',
                 };
-                showNotification(loginErrorMessages[error.code] || `Erro ao fazer login: ${error.message}`, "error");
+                showNotification(msgs[error.message] || `Erro ao fazer login: ${error.message}`, "error");
                 renderApp();
             }
         }
@@ -654,10 +637,9 @@
         // Função para lidar com o logout
         async function handleLogout() {
             try {
-                await signOut(auth);
+                await supabase.auth.signOut();
                 showNotification("Logout realizado com sucesso!", "success");
             } catch (error) {
-                console.error("Erro no logout:", error);
                 showNotification("Erro ao fazer logout.", "error");
             }
         }
@@ -696,85 +678,72 @@
             }
         }
 
-        // Retorna a referência da coleção baseada se é pública ou não
-        function getCollectionRef(collectionName, isPublic = true) {
-            if (isPublic) {
-                return collection(db, 'artifacts', currentAppId, 'public', 'data', collectionName);
-            }
-            // Para coleções privadas ou específicas do app (como 'records' ou 'users_profile')
-            return collection(db, 'artifacts', currentAppId, collectionName);
-        }
-
-        // Função para buscar dados do Firestore com listener em tempo real
-        async function fetchDataWithListener(collectionName, dataKey, queryConstraints = [], isPublic = true, targetCollectionRef = null) {
+        // Busca dados de uma tabela Supabase e configura listener de tempo real
+        async function fetchTableData(tableName, dataKey) {
             if (!userProfile) return;
 
-            const collRef = targetCollectionRef || getCollectionRef(collectionName, isPublic);
-            let qConstraints = [...queryConstraints];
-
-            // Filtra records pelo managerId do gestor; employees são filtrados client-side
-            if (dataKey === 'records' && userProfile.isManager && !userProfile.isAdmin) {
-                qConstraints.push(where("managerId", "==", currentUser.uid));
+            // Busca inicial
+            let qb = supabase.from(tableName).select('*');
+            if (tableName === 'records' && userProfile.isManager && !userProfile.isAdmin) {
+                qb = qb.eq('manager_id', currentUser.id);
             }
-            // Employees: sem filtro Firestore; filtragem por setor é feita client-side via getEmployeeSectors()
+            if (tableName === 'records') qb = qb.order('created_at', { ascending: false });
 
-            let q = query(collRef, ...qConstraints);
+            const { data, error } = await qb;
+            if (error) {
+                console.error(`[fetchTableData] ${tableName}:`, error);
+                showNotification(`Falha ao carregar ${collectionDisplayName(tableName).plural}.`, 'error', 5000);
+                return;
+            }
 
-            const unsubscribe = onSnapshot(q, (snapshot) => {
-                const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                if (dataKey === 'records') {
-                    // Ordena registros pela data de criação em ordem decrescente
-                    items.sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
-                }
-                globalData[dataKey] = items;
-                // Clear selected IDs for any records that might have been deleted,
-                // or if the data itself changed significantly after the snapshot.
-                selectedRecordIds.forEach(id => {
-                    if (!items.some(item => item.id === id)) {
-                        selectedRecordIds.delete(id);
+            globalData[dataKey] = (data || []).map(fromDB);
+
+            // Configura listener de tempo real
+            const channelOpts = { event: '*', schema: 'public', table: tableName };
+            if (tableName === 'records' && userProfile.isManager && !userProfile.isAdmin) {
+                channelOpts.filter = `manager_id=eq.${currentUser.id}`;
+            }
+
+            const channel = supabase
+                .channel(`rt_${tableName}_${Date.now()}`)
+                .on('postgres_changes', channelOpts, async () => {
+                    let rq = supabase.from(tableName).select('*');
+                    if (tableName === 'records' && userProfile.isManager && !userProfile.isAdmin) {
+                        rq = rq.eq('manager_id', currentUser.id);
                     }
-                });
-                updateSelectedCountUI(); // Update UI after globalData is updated and selections potentially adjusted.
+                    if (tableName === 'records') rq = rq.order('created_at', { ascending: false });
 
-                // Re-render only if the current view depends on this specific data
-                if (document.getElementById('app-content')) {
-                    // Call applyFilters to ensure the displayed records match the current filter state
-                    // This is crucial because globalData.records has just been updated
-                    if (currentView === 'history') {
-                        applyFilters();
-                    } else {
-                        renderApp();
+                    const { data: fresh } = await rq;
+                    if (fresh) {
+                        globalData[dataKey] = fresh.map(fromDB);
+                        selectedRecordIds.forEach(id => {
+                            if (!fresh.some(item => item.id === id)) selectedRecordIds.delete(id);
+                        });
+                        updateSelectedCountUI();
+                        if (currentView === 'history') applyFilters();
+                        else renderApp();
                     }
-                }
-            }, (error) => {
-                console.error(`[fetchDataWithListener] Erro ao carregar ${collectionName} (dataKey: ${dataKey}). Path: ${collRef.path}. Query Constraints:`, qConstraints, "Objeto do Erro Firebase:", error);
-                showNotification(`Falha ao carregar ${collectionDisplayName(collectionName).plural}. Verifique suas permissões ou tente novamente.`, "error", 5000);
-                // NOT calling loadAllData() here to avoid potential loops if security rules are the issue.
-            });
-            unsubscribers.push(unsubscribe);
+                })
+                .subscribe();
+
+            unsubscribers.push(() => supabase.removeChannel(channel));
         }
 
         // Carrega todos os dados iniciais
         function loadAllData() {
             clearAllDataAndUnsubscribe();
-            if (userProfile) {
-                fetchDataWithListener('categories', 'categories');
-                fetchDataWithListener('sectors', 'sectors');
-                fetchDataWithListener('employees', 'employees');
-                fetchDataWithListener('rules', 'rules');
-                // Registros não são públicos, então o isPublic é false e a coleção é direta.
-                fetchDataWithListener('records', 'records', [], false, getCollectionRef('records', false));
-
-                // Apenas administradores buscam todos os perfis de usuários
-                if (userProfile.isAdmin) {
-                    fetchDataWithListener('users_profile', 'allUsers', [], false, getCollectionRef('users_profile', false));
-                }
-            }
+            if (!userProfile) return;
+            fetchTableData('categories', 'categories');
+            fetchTableData('sectors', 'sectors');
+            fetchTableData('employees', 'employees');
+            fetchTableData('rules', 'rules');
+            fetchTableData('records', 'records');
+            if (userProfile.isAdmin) fetchTableData('users_profile', 'allUsers');
         }
 
-        // Limpa os dados globais e cancela todos os listeners do Firestore
+        // Limpa dados globais e cancela todos os canais Supabase
         function clearAllDataAndUnsubscribe() {
-            unsubscribers.forEach(unsub => unsub());
+            unsubscribers.forEach(unsub => { try { unsub(); } catch(e) {} });
             unsubscribers = [];
             globalData = { categories: [], sectors: [], employees: [], rules: [], records: [], allUsers: [] };
             selectedRecordIds.clear();
@@ -801,15 +770,19 @@
             for (const emp of empUpdates) {
                 const newSectors = getEmployeeSectors(emp).map(s => s === oldName ? newName : s);
                 try {
-                    await updateDoc(doc(getCollectionRef('employees', true), emp.id), { sectors: newSectors, sector: newSectors[0] || '' });
-                } catch(e) { console.error('[cascadeSectorRename] Erro ao atualizar funcionário:', e); }
+                    await supabase.from('employees')
+                        .update({ sectors: newSectors, sector: newSectors[0] || '' })
+                        .eq('id', emp.id);
+                } catch(e) { console.error('[cascadeSectorRename] emp:', e); }
             }
             const userUpdates = globalData.allUsers.filter(u => getUserSectors(u).includes(oldName));
             for (const u of userUpdates) {
                 const newSectors = getUserSectors(u).map(s => s === oldName ? newName : s);
                 try {
-                    await updateDoc(doc(getCollectionRef('users_profile', false), u.id), { sectors: newSectors, sector: newSectors[0] || '' });
-                } catch(e) { console.error('[cascadeSectorRename] Erro ao atualizar usuário:', e); }
+                    await supabase.from('users_profile')
+                        .update({ sectors: newSectors, sector: newSectors[0] || '' })
+                        .eq('id', u.id);
+                } catch(e) { console.error('[cascadeSectorRename] user:', e); }
             }
             if (empUpdates.length > 0 || userUpdates.length > 0) {
                 showNotification(`Cascata: ${empUpdates.length} funcionário(s) e ${userUpdates.length} usuário(s) atualizados.`, 'info');
@@ -822,15 +795,19 @@
             for (const emp of empUpdates) {
                 const newSectors = getEmployeeSectors(emp).filter(s => s !== sectorName);
                 try {
-                    await updateDoc(doc(getCollectionRef('employees', true), emp.id), { sectors: newSectors, sector: newSectors[0] || '' });
-                } catch(e) { console.error('[cascadeSectorDelete] Erro ao atualizar funcionário:', e); }
+                    await supabase.from('employees')
+                        .update({ sectors: newSectors, sector: newSectors[0] || '' })
+                        .eq('id', emp.id);
+                } catch(e) { console.error('[cascadeSectorDelete] emp:', e); }
             }
             const userUpdates = globalData.allUsers.filter(u => getUserSectors(u).includes(sectorName));
             for (const u of userUpdates) {
                 const newSectors = getUserSectors(u).filter(s => s !== sectorName);
                 try {
-                    await updateDoc(doc(getCollectionRef('users_profile', false), u.id), { sectors: newSectors, sector: newSectors[0] || '' });
-                } catch(e) { console.error('[cascadeSectorDelete] Erro ao atualizar usuário:', e); }
+                    await supabase.from('users_profile')
+                        .update({ sectors: newSectors, sector: newSectors[0] || '' })
+                        .eq('id', u.id);
+                } catch(e) { console.error('[cascadeSectorDelete] user:', e); }
             }
         }
 
@@ -902,34 +879,25 @@
             return null;
         }
 
-        // Adiciona um registro de quadro móvel ao Firestore
+        // Adiciona um registro de quadro móvel ao Supabase
         async function addRecordToFirestore(recordData) {
-            if (!userProfile) {
-                showNotification("Perfil do usuário não carregado. Não é possível salvar o registro.", "error");
-                return Promise.reject(new Error("Perfil não carregado"));
-            }
-            if (!userProfile.isManager) {
+            if (!userProfile?.isManager) {
                 showNotification("Apenas gestores podem adicionar registros.", "error");
-                return Promise.reject(new Error("Acesso negado, não é gestor"));
+                return { success: false, error: "Acesso negado" };
             }
             const managerSectorsArr = getUserSectors(userProfile);
             if (managerSectorsArr.length === 0) {
-                showNotification("Setor do gestor não definido no perfil. Não é possível salvar o registro. Contacte o administrador.", "error");
-                console.error("[addRecordToFirestore] Tentativa de salvar registro, mas gestor não tem setores:", userProfile);
-                return Promise.reject(new Error("Setor do gestor não definido"));
+                showNotification("Setor do gestor não definido. Contacte o administrador.", "error");
+                return { success: false, error: "Setor não definido" };
             }
 
             const resolvedSector = recordData.sector || managerSectorsArr[0] || '';
             const sectorName = resolvedSector.toLowerCase();
 
             const ruleError = validateRecordWithRules(recordData, sectorName);
-            if (ruleError) {
-                return { success: false, error: ruleError };
-            }
+            if (ruleError) return { success: false, error: ruleError };
 
             if (sectorName === 'scout (base)') {
-                const eventDateObj = new Date(recordData.eventDate + 'T00:00:00');
-
                 const dailyExists = globalData.records.some(r =>
                     r.employeeId === recordData.employeeId &&
                     r.eventDate === recordData.eventDate &&
@@ -939,186 +907,115 @@
                     showNotification("No Scout (base) cada funcionário só pode registrar um QM por dia.", "error");
                     return { success: false, error: "Limite diário" };
                 }
-
+                const eventDateObj = new Date(recordData.eventDate + 'T00:00:00');
                 const monthKey = `${eventDateObj.getFullYear()}-${String(eventDateObj.getMonth()+1).padStart(2,'0')}`;
                 const monthlyCount = globalData.records.filter(r =>
                     r.employeeId === recordData.employeeId &&
                     r.sector?.toLowerCase() === sectorName &&
-                    r.eventDate && r.eventDate.startsWith(monthKey)
+                    r.eventDate?.startsWith(monthKey)
                 ).length;
                 if (monthlyCount >= 8) {
-                    showNotification("Limite de 8 QMs mensais por funcionário atingido para este setor.", "error");
+                    showNotification("Limite de 8 QMs mensais por funcionário atingido.", "error");
                     return { success: false, error: "Limite mensal" };
                 }
             }
 
             try {
-                const recordsCollectionRef = getCollectionRef('records', false); // Registros não são públicos
-                const dataToSave = {
+                const dataToSave = toDB({
                     ...recordData,
-                    managerId: currentUser.uid,
+                    managerId: currentUser.id,
                     managerName: userProfile.name,
                     sector: resolvedSector,
-                    createdAt: Timestamp.now()
-                };
-                console.log("[addRecordToFirestore] Dados para salvar:", dataToSave);
-                await addDoc(recordsCollectionRef, dataToSave);
-                // showNotification("Registro adicionado com sucesso!", "success"); // Notificação movida para handleFileUpload
-                // currentView = userProfile.isAdmin ? 'adminDashboard' : 'managerDashboard'; // Renderização movida para handleFileUpload
-                // renderApp(); // Renderização movida para handleFileUpload
+                });
+                const { error } = await supabase.from('records').insert(dataToSave);
+                if (error) throw error;
                 return { success: true };
             } catch (error) {
-                console.error("[addRecordToFirestore] Erro ao adicionar registro:", error);
-                // showNotification("Falha ao adicionar registro. Verifique o console para detalhes.", "error"); // Notificação movida para handleFileUpload
+                console.error("[addRecordToFirestore] Erro:", error);
                 return { success: false, error: error.message };
             }
         }
 
-        // Adiciona um novo item (categoria, setor, funcionário) ao Firestore
-        async function addItemToFirestore(collectionNameKey, data, isPublic = true) {
-            if (!userProfile) {
-                showNotification("Perfil de usuário não carregado. Tente recarregar a página.", "error");
-                return Promise.reject(new Error("Perfil não carregado"));
-            }
-            if (!userProfile.isAdmin) {
+        // Adiciona um novo item (categoria, setor, funcionário) ao Supabase
+        async function addItemToFirestore(tableName, data) {
+            if (!userProfile?.isAdmin) {
                 showNotification("Acesso negado. Apenas administradores podem adicionar itens.", "error");
                 return Promise.reject(new Error("Acesso negado"));
             }
-            if (!currentUser || !currentUser.uid) {
-                showNotification("Informação do usuário atual (UID) não disponível.", "error");
-                return Promise.reject(new Error("UID do usuário não disponível"));
-            }
-
-            const dataToWrite = { ...data, createdAt: Timestamp.now(), createdBy: currentUser.uid };
-
-            console.log(`[addItemToFirestore] Tentando adicionar em '${collectionNameKey}'.`);
-            console.log(`[addItemToFirestore] Path: artifacts/${currentAppId}/${isPublic ? 'public/data/' : ''}${collectionNameKey}`);
-            console.log("[addItemToFirestore] Dados para escrever:", JSON.stringify(dataToWrite));
-            console.log(`[addItemToFirestore] UID do Usuário: ${currentUser.uid}, isAdmin (cliente): ${userProfile.isAdmin}`);
-
             try {
-                const collRef = getCollectionRef(collectionNameKey, isPublic);
-                await addDoc(collRef, dataToWrite);
-                showNotification(`${collectionDisplayName(collectionNameKey).singular} adicionado com sucesso!`, "success");
+                const { error } = await supabase.from(tableName).insert(toDB(data));
+                if (error) throw error;
+                showNotification(`${collectionDisplayName(tableName).singular} adicionado com sucesso!`, "success");
             } catch (e) {
-                showNotification(`Erro ao adicionar ${collectionDisplayName(collectionNameKey).singular}. Detalhes no console.`, "error");
-                console.error(`[addItemToFirestore] Falha ao adicionar em '${collectionNameKey}'. Path: artifacts/${currentAppId}/${isPublic ? 'public/data/' : ''}${collectionNameKey}. UID: ${currentUser.uid}. Dados:`, dataToWrite, "Objeto do Erro:", e);
+                showNotification(`Erro ao adicionar ${collectionDisplayName(tableName).singular}.`, "error");
+                console.error(`[addItemToFirestore] ${tableName}:`, e);
                 throw e;
             }
         }
 
-        // Atualiza um item existente no Firestore
-        async function updateItemInFirestore(collectionNameKey, id, data, isPublic = true, targetCollectionRef = null) {
-            if (!userProfile) {
-                showNotification("Perfil de usuário não carregado. Tente recarregar a página.", "error");
-                return Promise.reject(new Error("Perfil não carregado"));
-            }
-            if (!userProfile.isAdmin) {
+        // Atualiza um item existente no Supabase
+        async function updateItemInFirestore(tableName, id, data) {
+            if (!userProfile?.isAdmin) {
                 showNotification("Acesso negado.", "error");
                 return Promise.reject(new Error("Acesso negado"));
             }
-            if (!currentUser || !currentUser.uid) {
-                showNotification("Informação do usuário atual (UID) não disponível.", "error");
-                return Promise.reject(new Error("UID do usuário não disponível"));
-            }
-            const dataToWrite = { ...data, updatedAt: Timestamp.now(), updatedBy: currentUser.uid };
-            console.log(`Tentando atualizar item '${id}' em '${collectionNameKey}'. Path: artifacts/${currentAppId}/${isPublic ? 'public/data/' : ''}${collectionNameKey}`);
-            console.log("Dados para atualizar:", dataToWrite);
-
             try {
-                const itemDocRef = doc(targetCollectionRef || getCollectionRef(collectionNameKey, isPublic), id);
-                await updateDoc(itemDocRef, dataToWrite);
-                showNotification(`${collectionDisplayName(collectionNameKey).singular} atualizado com sucesso!`, "success");
+                const { error } = await supabase.from(tableName).update(toDB(data)).eq('id', id);
+                if (error) throw error;
+                showNotification(`${collectionDisplayName(tableName).singular} atualizado com sucesso!`, "success");
             } catch (e) {
-                showNotification(`Erro ao atualizar ${collectionDisplayName(collectionNameKey).singular}. Detalhes no console.`, "error");
-                console.error(`Falha ao atualizar item '${id}' em '${collectionNameKey}'. Dados:`, dataToWrite, "Objeto do Erro:", e);
+                showNotification(`Erro ao atualizar ${collectionDisplayName(tableName).singular}.`, "error");
+                console.error(`[updateItemInFirestore] ${tableName}/${id}:`, e);
                 throw e;
             }
         }
 
-        // New helper function for direct deletion without confirmation UI
-        async function _performDirectDelete(collectionNameKey, id, isPublic = true, targetCollectionRef = null) {
+        // Exclui um item diretamente, sem UI de confirmação
+        async function _performDirectDelete(tableName, id) {
             try {
-                const docRef = doc(targetCollectionRef || getCollectionRef(collectionNameKey, isPublic), id);
-                await deleteDoc(docRef);
+                const { error } = await supabase.from(tableName).delete().eq('id', id);
+                if (error) throw error;
                 return { success: true };
             } catch (e) {
-                console.error(`[Delete Item Direct] Falha ao excluir item '${id}' de '${collectionNameKey}'. Objeto do Erro:`, e);
+                console.error(`[_performDirectDelete] ${tableName}/${id}:`, e);
                 return { success: false, error: e.message };
             }
         }
 
-        // Modified deleteItemFromFirestore to use the direct delete or trigger confirmation
-        async function deleteItemFromFirestore(collectionNameKey, id, isPublic = true, targetCollectionRef = null, skipConfirmation = false) {
-            let canDelete = false;
-            if (userProfile?.isAdmin) {
-                canDelete = true;
-            } else if (collectionNameKey === 'records' && userProfile?.isManager) {
-                // For records, check if the manager owns it (simplified check for now)
-                const record = globalData.records.find(r => r.id === id);
-                if (record && record.managerId === currentUser.uid) { // Assuming managerId exists on record and currentUser.uid is available
-                    canDelete = true;
-                } else if (userProfile.isAdmin) { // Admins can delete any record
-                    canDelete = true;
-                }
-            }
-
+        // Exclui um item com verificação de permissão e confirmação opcional
+        async function deleteItemFromFirestore(tableName, id, _a, _b, skipConfirmation = false) {
+            const canDelete = userProfile?.isAdmin ||
+                (tableName === 'records' && userProfile?.isManager &&
+                 globalData.records.find(r => r.id === id)?.managerId === currentUser.id);
             if (!canDelete) {
                 showNotification("Acesso negado para exclusão.", "error");
                 return;
             }
-
-            if (skipConfirmation) {
-                return await _performDirectDelete(collectionNameKey, id, isPublic, targetCollectionRef);
-            }
-
-            // Normal confirmation flow for single deletion
+            if (skipConfirmation) return await _performDirectDelete(tableName, id);
             confirmAction(
-                `Confirmar Exclusão`,
-                `Tem certeza que deseja excluir este item de ${collectionDisplayName(collectionNameKey).plural}? Esta ação não pode ser desfeita.`,
+                'Confirmar Exclusão',
+                `Tem certeza que deseja excluir este item de ${collectionDisplayName(tableName).plural}? Esta ação não pode ser desfeita.`,
                 async () => {
-                    const result = await _performDirectDelete(collectionNameKey, id, isPublic, targetCollectionRef);
-                    if (result.success) {
-                        showNotification(`${collectionDisplayName(collectionNameKey).singular} excluído com sucesso!`, "success");
-                        // This will trigger onSnapshot and then renderApp, which will handle selectedRecordIds
-                        // selectedRecordIds.delete(id); // Removed, as onSnapshot update handles it
-                        // No explicit renderApp() here as onSnapshot listener takes care of it
-                    } else {
-                        showNotification(`Erro ao excluir ${collectionDisplayName(collectionNameKey).singular}.`, "error");
-                    }
+                    const result = await _performDirectDelete(tableName, id);
+                    if (result.success) showNotification(`${collectionDisplayName(tableName).singular} excluído com sucesso!`, "success");
+                    else showNotification(`Erro ao excluir ${collectionDisplayName(tableName).singular}.`, "error");
                 }
             );
         }
 
-        // Exclui completamente um usuário (Auth e Firestore)
+        // Exclui o perfil de um usuário (conta auth permanece; removê-la requer o painel Supabase)
         async function deleteUserCompletely(uid) {
-            if (!userProfile?.isAdmin) {
-                showNotification("Acesso negado.", "error");
-                return;
-            }
+            if (!userProfile?.isAdmin) { showNotification("Acesso negado.", "error"); return; }
             confirmAction(
-                `Excluir Usuário`,
-                `Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.`,
+                'Excluir Usuário',
+                'Tem certeza que deseja excluir este usuário? O perfil será removido. A conta de autenticação deve ser excluída no painel do Supabase.',
                 async () => {
                     try {
-                        await deleteDoc(doc(getCollectionRef('users_profile', false), uid));
-                        if (deleteUserEndpoint) {
-                            const token = await currentUser.getIdToken();
-                            const resp = await fetch(deleteUserEndpoint, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${token}`
-                                },
-                                body: JSON.stringify({ uid })
-                            });
-                            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                        } else {
-                            console.warn('deleteUserEndpoint não configurado');
-                        }
+                        const { error } = await supabase.from('users_profile').delete().eq('id', uid);
+                        if (error) throw error;
                         showNotification('Usuário excluído com sucesso!', 'success');
                     } catch (err) {
-                        console.error('[deleteUserCompletely] Erro ao excluir usuário:', err);
+                        console.error('[deleteUserCompletely]:', err);
                         showNotification('Erro ao excluir usuário.', 'error');
                     }
                 }
@@ -1338,13 +1235,16 @@
                 submitButton.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Enviando...</span>`;
 
                 try {
-                    await sendPasswordResetEmail(auth, email);
+                    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                        redirectTo: window.location.href
+                    });
+                    if (error) throw error;
                     showNotification("Link de redefinição enviado para seu e-mail!", "success");
                     currentView = 'login';
                     renderApp();
-                }  catch (error) {
+                } catch (error) {
                     console.error("Erro ao enviar link de redefinição:", error);
-                    showNotification(error.code === 'auth/user-not-found' ? "E-mail não cadastrado." : `Erro: ${error.message}`, "error");
+                    showNotification(`Erro: ${error.message}`, "error");
                 } finally {
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalButtonContent;
@@ -1361,14 +1261,13 @@
         async function renderSetupPage() {
             const inputBaseClass = "w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all";
 
-            // Verifica se já existem perfis de admin cadastrados
+            // Verifica se já existem perfis de admin cadastrados via RPC pública
             let systemAlreadyConfigured = false;
             try {
-                const usersRef = getCollectionRef('users_profile', false);
-                const snap = await getDocs(query(usersRef));
-                systemAlreadyConfigured = snap.docs.some(d => d.data().isAdmin === true);
+                const { data } = await supabase.rpc('check_admin_exists');
+                systemAlreadyConfigured = data === true;
             } catch (_) {
-                // Se a leitura falhar por regras de segurança, assume que pode estar vazio
+                // Se falhar, assume que pode estar vazio (setup permitido)
             }
 
             if (systemAlreadyConfigured) {
@@ -1459,46 +1358,41 @@
                 submitButton.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Criando administrador...</span>`;
 
                 try {
-                    // Passo 1: Cria o usuário no Firebase Auth via app secundária
-                    const uid = await createAuthUser(email, password);
+                    // Passo 1: Cria o usuário via instância Supabase temporária
+                    const tmpClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    const { data: signUpData, error: signUpError } = await tmpClient.auth.signUp({ email, password });
+                    if (signUpError) throw signUpError;
 
-                    // Passo 2: Abre uma SEGUNDA instância temporária para escrever o perfil
-                    // ANTES de fazer login na instância principal (evita race condition com onAuthStateChanged)
-                    const tempWriteApp = initializeApp(firebaseConfig, 'temp-write-' + Date.now());
-                    const tempWriteAuth = getAuth(tempWriteApp);
-                    const tempWriteDb = getFirestore(tempWriteApp);
+                    const uid = signUpData.user.id;
 
-                    await signInWithEmailAndPassword(tempWriteAuth, email, password);
-
-                    const adminProfileRef = doc(
-                        collection(tempWriteDb, 'artifacts', currentAppId, 'users_profile'),
-                        uid
-                    );
-                    await setDoc(adminProfileRef, {
+                    // Passo 2: O mesmo usuário (tmpClient) grava seu próprio perfil admin.
+                    // A policy RLS "Setup inicial" permite inserção quando não há admin.
+                    const { error: profileError } = await tmpClient.from('users_profile').insert({
+                        id: uid,
                         name,
                         email,
                         sector: '',
-                        isManager: true,
-                        isAdmin: true,
+                        sectors: [],
+                        is_manager: true,
+                        is_admin: true,
                         uid,
-                        createdAt: Timestamp.now()
                     });
+                    if (profileError) throw profileError;
 
-                    await signOut(tempWriteAuth);
-                    await deleteApp(tempWriteApp);
+                    await tmpClient.auth.signOut();
 
-                    // Passo 3: Agora faz login na instância principal — perfil já existe no Firestore
-                    await signInWithEmailAndPassword(auth, email, password);
+                    // Passo 3: Faz login na instância principal — perfil já existe
+                    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+                    if (signInError) throw signInError;
+
                     showNotification('Administrador criado com sucesso! Bem-vindo ao sistema.', 'success');
-                    // onAuthStateChanged encontrará o perfil e navegará para o painel admin
+                    // onAuthStateChange encontrará o perfil e navegará para o painel admin
                 } catch (error) {
                     console.error('[renderSetupPage] Erro ao criar admin:', error);
-                    const msg = error.code === 'auth/email-already-in-use'
+                    const msg = error.message?.includes('User already registered')
                         ? 'Este email já está em uso. Tente o login normal.'
-                        : error.code === 'auth/weak-password'
+                        : error.message?.includes('Password should be at least')
                         ? 'Senha muito fraca. Use pelo menos 6 caracteres.'
-                        : error.code === 'auth/invalid-email'
-                        ? 'Email inválido.'
                         : `Erro ao criar administrador: ${error.message}`;
                     showNotification(msg, 'error');
                     submitButton.disabled = false;
@@ -1574,16 +1468,25 @@
             submitButton.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Processando...</span>`;
 
             try {
-                const user = auth.currentUser;
-                const credential = EmailAuthProvider.credential(user.email, currentPassword);
-                await reauthenticateWithCredential(user, credential);
-                await updatePassword(user, newPassword);
+                // Verifica senha atual fazendo login novamente
+                const { error: authError } = await supabase.auth.signInWithPassword({
+                    email: currentUser.email,
+                    password: currentPassword
+                });
+                if (authError) throw new Error('auth/wrong-password');
+
+                // Atualiza para a nova senha
+                const { error } = await supabase.auth.updateUser({ password: newPassword });
+                if (error) throw error;
+
                 showNotification('Senha atualizada com sucesso!', 'success');
                 currentView = userProfile.isAdmin ? 'adminDashboard' : 'managerDashboard';
                 renderApp();
             } catch (error) {
-                console.error('Erro ao redefinir senha:', error);
-                showNotification(error.code === 'auth/wrong-password' ? 'Senha atual incorreta.' : `Erro: ${error.message}`, 'error');
+                showNotification(
+                    error.message === 'auth/wrong-password' ? 'Senha atual incorreta.' : `Erro: ${error.message}`,
+                    'error'
+                );
             } finally {
                 submitButton.disabled = false;
                 submitButton.innerHTML = originalContent;
@@ -2430,7 +2333,7 @@
                 return data;
             };
 
-            const applyFilters = () => {
+            applyFilters = () => {
                 const records = getFilteredRecords();
                 const container = document.getElementById('record-history-table-container');
                 if (container) {
@@ -2642,7 +2545,7 @@
 
                         // Perform deletions sequentially to await each promise
                         for (const recordDetail of recordsToDeleteDetails) {
-                            const result = await _performDirectDelete('records', recordDetail.id, false, getCollectionRef('records', false));
+                            const result = await _performDirectDelete('records', recordDetail.id);
                             if (result.success) {
                                 successfulDeletions++;
                                 idsActuallyDeleted.add(recordDetail.id);
@@ -2713,8 +2616,7 @@
                             `Confirmar Exclusão`,
                             `Tem certeza que deseja excluir este registro? Esta ação não pode ser desfeita.`,
                             async () => {
-                                await deleteItemFromFirestore('records', recordId, false, getCollectionRef('records', false), true);
-                                // The onSnapshot listener will trigger renderApp and update UI
+                                await deleteItemFromFirestore('records', recordId, null, null, true);
                             }
                         );
                     }
@@ -3073,7 +2975,7 @@
                             <button id="btn-back-manage-users" class="px-3.5 py-2 text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg transition-colors">← Voltar</button>
                         </div>
                         <form id="user-profile-form" class="space-y-4">
-                            ${isCreating ? '<input type="hidden" id="userProfileUid">' : `<div><label class="${lbl}">UID (Firebase Auth)</label><input type="text" id="userProfileUid" value="${userToEdit?.id || ''}" class="${inp} bg-slate-50 text-slate-500 cursor-not-allowed" readonly></div>`}
+                            ${isCreating ? '<input type="hidden" id="userProfileUid">' : `<div><label class="${lbl}">ID do Usuário</label><input type="text" id="userProfileUid" value="${userToEdit?.id || ''}" class="${inp} bg-slate-50 text-slate-500 cursor-not-allowed" readonly></div>`}
                             <div><label for="userProfileName" class="${lbl}">Nome Completo</label>
                                  <input type="text" id="userProfileName" value="${userToEdit?.name || ''}" class="${inp}" required placeholder="Nome completo"></div>
                             <div><label for="userProfileEmail" class="${lbl}">Email</label>
@@ -3139,13 +3041,11 @@
                         document.getElementById('userProfileUid').value = uid;
                     } catch (error) {
                         console.error('Erro ao criar usuário Auth:', error);
-                        const createUserErrors = {
-                            'auth/email-already-in-use': 'Este email já está em uso por outra conta.',
-                            'auth/invalid-email': 'Email inválido.',
-                            'auth/weak-password': 'Senha muito fraca. Use pelo menos 6 caracteres.',
-                            'auth/operation-not-allowed': 'Operação não permitida. Contate o suporte.'
+                        const msgs = {
+                            'User already registered': 'Este email já está em uso por outra conta.',
+                            'Password should be at least 6 characters': 'Senha muito fraca. Use pelo menos 6 caracteres.',
                         };
-                        showNotification(createUserErrors[error.code] || 'Erro ao criar usuário: ' + error.message, 'error');
+                        showNotification(msgs[error.message] || 'Erro ao criar usuário: ' + error.message, 'error');
                         submitButton.disabled = false;
                         submitButton.innerHTML = originalButtonText;
                         return;
@@ -3171,24 +3071,26 @@
                 }
 
                 const profileData = {
+                    id: uid,
                     name: document.getElementById('userProfileName').value,
                     email: email,
                     sectors: selectedSectors,
                     sector: selectedSectors[0] || '',
-                    isManager: isManagerChecked,
-                    isAdmin: document.getElementById('userProfileIsAdmin').checked,
+                    is_manager: isManagerChecked,
+                    is_admin: document.getElementById('userProfileIsAdmin').checked,
                     uid: uid
                 };
 
                 try {
-                    const userDocRef = doc(getCollectionRef('users_profile', false), uid);
-                    // setDoc com { merge: true } para atualizar ou criar se não existir
-                    await setDoc(userDocRef, profileData, { merge: !isCreating });
+                    const { error } = isCreating
+                        ? await supabase.from('users_profile').insert(profileData)
+                        : await supabase.from('users_profile').update(profileData).eq('id', uid);
+                    if (error) throw error;
                     showNotification(`Perfil de usuário ${isCreating ? 'criado' : 'atualizado'} com sucesso!`, "success");
                     currentView = 'adminManageUsers';
                     renderApp();
                 } catch (error) {
-                    showNotification(`Erro ao ${isCreating ? 'criar' : 'atualizar'} perfil. Detalhes no console.`, "error");
+                    showNotification(`Erro ao ${isCreating ? 'criar' : 'atualizar'} perfil.`, "error");
                     console.error(`Erro ao salvar perfil de usuário ${uid}:`, error);
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalButtonText;
@@ -3363,10 +3265,8 @@
         }
 
 
-        // Garante que o login inicial seja tentado ao carregar a página
-        document.addEventListener('DOMContentLoaded', () => {
-            performInitialSignIn();
-        });
+        // Supabase dispara onAuthStateChange automaticamente ao carregar;
+        // nenhuma ação adicional necessária no DOMContentLoaded.
 
     </script>
 </body>
