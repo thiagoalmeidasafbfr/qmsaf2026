@@ -216,22 +216,31 @@
 
         /* ── Tabela ── */
         .tbl th {
-            padding: 9px 16px;
+            padding: 8px 14px;
             font-size: 11px; font-weight: 600;
             color: var(--apple-2nd);
             background: var(--apple-bg);
             border-bottom: 1px solid var(--apple-border);
             text-align: left;
             letter-spacing: .01em;
+            white-space: nowrap;
+            position: sticky; top: 0; z-index: 1;
         }
         .tbl td {
-            padding: 11px 16px; font-size: 13px;
+            padding: 9px 14px; font-size: 13px;
             color: var(--apple-text);
             border-bottom: 1px solid var(--apple-sep);
             vertical-align: middle;
         }
         .tbl tr:last-child td { border-bottom: none; }
         .tbl tbody tr:hover td { background: rgba(0,0,0,.018); }
+
+        /* Wrapper para tabela com altura dinâmica */
+        .tbl-scroll-wrap {
+            overflow: auto;
+            max-height: calc(100vh - 260px);
+            min-height: 300px;
+        }
 
         /* ── Avatar ── */
         .avatar {
@@ -288,7 +297,7 @@
             </div>
         </header>
 
-        <main id="app-content" class="max-w-screen-2xl mx-auto w-full px-4 md:px-6 lg:px-8 py-6 flex-grow">
+        <main id="app-content" class="w-full px-3 sm:px-5 lg:px-7 py-5 flex-grow min-h-0">
             <div id="initial-loading" class="flex flex-col items-center justify-center min-h-[60vh]">
                 <div class="loader mb-4"></div>
                 <p style="color:var(--apple-3rd);font-size:14px">Inicializando aplicação...</p>
@@ -657,7 +666,8 @@
         function updateHeaderUI() {
             if (userProfile) {
                 const initials = userProfile.name.split(' ').slice(0,2).map(n => n[0]).join('').toUpperCase();
-                const roleLabel = userProfile.isAdmin ? 'Administrador' : userProfile.isManager ? `Gestor · ${userProfile.sector}` : 'Usuário';
+                const userSectors = getUserSectors(userProfile);
+                const roleLabel = userProfile.isAdmin ? 'Administrador' : userProfile.isManager ? `Gestor · ${userSectors.join(', ') || '—'}` : 'Usuário';
                 userInfoHeader.innerHTML = `
                     <button id="btn-change-password" style="font-size:12px;font-weight:500;color:var(--apple-2nd);padding:6px 10px;border-radius:8px;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background .12s" onmouseover="this.style.background='var(--apple-bg)'" onmouseout="this.style.background='none'">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
@@ -702,14 +712,11 @@
             const collRef = targetCollectionRef || getCollectionRef(collectionName, isPublic);
             let qConstraints = [...queryConstraints];
 
-            // Filtra records e employees pelo setor do gestor, se não for admin
+            // Filtra records pelo managerId do gestor; employees são filtrados client-side
             if (dataKey === 'records' && userProfile.isManager && !userProfile.isAdmin) {
-                qConstraints.push(where("sector", "==", userProfile.sector));
-                qConstraints.push(where("managerId", "==", currentUser.uid)); // Adicionando filtro por managerId para gestores
+                qConstraints.push(where("managerId", "==", currentUser.uid));
             }
-            if (dataKey === 'employees' && userProfile.isManager && !userProfile.isAdmin) {
-                qConstraints.push(where("sector", "==", userProfile.sector));
-            }
+            // Employees: sem filtro Firestore; filtragem por setor é feita client-side via getEmployeeSectors()
 
             let q = query(collRef, ...qConstraints);
 
@@ -770,7 +777,61 @@
             unsubscribers.forEach(unsub => unsub());
             unsubscribers = [];
             globalData = { categories: [], sectors: [], employees: [], rules: [], records: [], allUsers: [] };
-            selectedRecordIds.clear(); // Clear selections when data is reset
+            selectedRecordIds.clear();
+        }
+
+        // Retorna array de setores de um funcionário (suporte a campo legado e novo)
+        function getEmployeeSectors(emp) {
+            if (Array.isArray(emp.sectors) && emp.sectors.length > 0) return emp.sectors;
+            if (emp.sector) return [emp.sector];
+            return [];
+        }
+
+        // Retorna array de setores de um usuário (suporte a campo legado e novo)
+        function getUserSectors(user) {
+            if (!user) return [];
+            if (Array.isArray(user.sectors) && user.sectors.length > 0) return user.sectors;
+            if (user.sector) return [user.sector];
+            return [];
+        }
+
+        // Cascata ao renomear setor: atualiza funcionários e usuários
+        async function cascadeSectorRename(oldName, newName) {
+            const empUpdates = globalData.employees.filter(emp => getEmployeeSectors(emp).includes(oldName));
+            for (const emp of empUpdates) {
+                const newSectors = getEmployeeSectors(emp).map(s => s === oldName ? newName : s);
+                try {
+                    await updateDoc(doc(getCollectionRef('employees', true), emp.id), { sectors: newSectors, sector: newSectors[0] || '' });
+                } catch(e) { console.error('[cascadeSectorRename] Erro ao atualizar funcionário:', e); }
+            }
+            const userUpdates = globalData.allUsers.filter(u => getUserSectors(u).includes(oldName));
+            for (const u of userUpdates) {
+                const newSectors = getUserSectors(u).map(s => s === oldName ? newName : s);
+                try {
+                    await updateDoc(doc(getCollectionRef('users_profile', false), u.id), { sectors: newSectors, sector: newSectors[0] || '' });
+                } catch(e) { console.error('[cascadeSectorRename] Erro ao atualizar usuário:', e); }
+            }
+            if (empUpdates.length > 0 || userUpdates.length > 0) {
+                showNotification(`Cascata: ${empUpdates.length} funcionário(s) e ${userUpdates.length} usuário(s) atualizados.`, 'info');
+            }
+        }
+
+        // Cascata ao excluir setor: remove vínculo de funcionários e usuários
+        async function cascadeSectorDelete(sectorName) {
+            const empUpdates = globalData.employees.filter(emp => getEmployeeSectors(emp).includes(sectorName));
+            for (const emp of empUpdates) {
+                const newSectors = getEmployeeSectors(emp).filter(s => s !== sectorName);
+                try {
+                    await updateDoc(doc(getCollectionRef('employees', true), emp.id), { sectors: newSectors, sector: newSectors[0] || '' });
+                } catch(e) { console.error('[cascadeSectorDelete] Erro ao atualizar funcionário:', e); }
+            }
+            const userUpdates = globalData.allUsers.filter(u => getUserSectors(u).includes(sectorName));
+            for (const u of userUpdates) {
+                const newSectors = getUserSectors(u).filter(s => s !== sectorName);
+                try {
+                    await updateDoc(doc(getCollectionRef('users_profile', false), u.id), { sectors: newSectors, sector: newSectors[0] || '' });
+                } catch(e) { console.error('[cascadeSectorDelete] Erro ao atualizar usuário:', e); }
+            }
         }
 
         // --- Utilidades de Datas ---
@@ -851,13 +912,15 @@
                 showNotification("Apenas gestores podem adicionar registros.", "error");
                 return Promise.reject(new Error("Acesso negado, não é gestor"));
             }
-            if (!userProfile.sector || userProfile.sector.trim() === "") {
+            const managerSectorsArr = getUserSectors(userProfile);
+            if (managerSectorsArr.length === 0) {
                 showNotification("Setor do gestor não definido no perfil. Não é possível salvar o registro. Contacte o administrador.", "error");
-                console.error("[addRecordToFirestore] Tentativa de salvar registro, mas userProfile.sector é indefinido ou vazio:", userProfile);
+                console.error("[addRecordToFirestore] Tentativa de salvar registro, mas gestor não tem setores:", userProfile);
                 return Promise.reject(new Error("Setor do gestor não definido"));
             }
 
-            const sectorName = (userProfile.sector || '').toLowerCase();
+            const resolvedSector = recordData.sector || managerSectorsArr[0] || '';
+            const sectorName = resolvedSector.toLowerCase();
 
             const ruleError = validateRecordWithRules(recordData, sectorName);
             if (ruleError) {
@@ -895,7 +958,7 @@
                     ...recordData,
                     managerId: currentUser.uid,
                     managerName: userProfile.name,
-                    sector: userProfile.sector,
+                    sector: resolvedSector,
                     createdAt: Timestamp.now()
                 };
                 console.log("[addRecordToFirestore] Dados para salvar:", dataToSave);
@@ -1111,15 +1174,38 @@
                     renderAdminManageGenericPage('sectors', globalData.sectors,
                         [{ name: 'name', label: 'Nome do Setor', type: 'text' }],
                         (data) => addItemToFirestore('sectors', data),
-                        (id, data) => updateItemInFirestore('sectors', id, data),
-                        (id) => deleteItemFromFirestore('sectors', id)
+                        async (id, data) => {
+                            const oldSector = globalData.sectors.find(s => s.id === id);
+                            const oldName = oldSector?.name;
+                            await updateItemInFirestore('sectors', id, data);
+                            if (oldName && data.name && oldName !== data.name) {
+                                await cascadeSectorRename(oldName, data.name);
+                            }
+                        },
+                        async (id) => {
+                            const sectorToDelete = globalData.sectors.find(s => s.id === id);
+                            const sectorName = sectorToDelete?.name;
+                            confirmAction(
+                                'Confirmar Exclusão de Setor',
+                                `Tem certeza que deseja excluir o setor "${sectorName}"? Funcionários e usuários vinculados serão desvinculados automaticamente.`,
+                                async () => {
+                                    const result = await _performDirectDelete('sectors', id, true);
+                                    if (result.success) {
+                                        showNotification('Setor excluído com sucesso!', 'success');
+                                        if (sectorName) await cascadeSectorDelete(sectorName);
+                                    } else {
+                                        showNotification('Erro ao excluir setor.', 'error');
+                                    }
+                                }
+                            );
+                        }
                     ); break;
                 case 'adminManageEmployees':
                     renderAdminManageGenericPage('employees', globalData.employees,
                         [
                             { name: 'name', label: 'Nome do Funcionário', type: 'text' },
-                            { name: 'registration', label: 'Matrícula', type: 'text' },
-                            { name: 'sector', label: 'Setor', type: 'select', options: globalData.sectors.map(s => ({ value: s.name, label: s.name })) },
+                            { name: 'registration', label: 'Matrícula (Chapa)', type: 'text' },
+                            { name: 'sectors', label: 'Departamentos', type: 'multiselect-sectors', options: globalData.sectors.map(s => ({ value: s.name, label: s.name })) },
                         ],
                         (data) => addItemToFirestore('employees', data),
                         (id, data) => updateItemInFirestore('employees', id, data),
@@ -1561,9 +1647,18 @@
 
         // Renderiza o formulário para inclusão de novo registro
         function renderNewRecordForm() {
-            // Filtra funcionários pelo setor do gestor, se não for admin
-            const employeesFilteredBySector = userProfile.isAdmin ? globalData.employees : globalData.employees.filter(emp => emp.sector === userProfile.sector);
-            const employeesOptions = employeesFilteredBySector.map(emp => `<option value="${emp.id}">${emp.name} (${emp.registration}) - ${emp.sector}</option>`).join('') + '<option value="OUTROS">Outros</option>';
+            // Filtra funcionários pelos setores do gestor, se não for admin
+            const managerSectors = getUserSectors(userProfile);
+            const employeesFilteredBySector = userProfile.isAdmin
+                ? globalData.employees
+                : globalData.employees.filter(emp => {
+                    const empSectors = getEmployeeSectors(emp);
+                    return empSectors.some(s => managerSectors.includes(s));
+                });
+            const employeesOptions = employeesFilteredBySector.map(emp => {
+                const empSectors = getEmployeeSectors(emp);
+                return `<option value="${emp.id}">${emp.name} (${emp.registration || '—'}) - ${empSectors.join(', ')}</option>`;
+            }).join('') + '<option value="OUTROS">Outros</option>';
             const inp = `w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all`;
             const inputBaseClass = inp;
             const gameCatOptions = GAME_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
@@ -1609,6 +1704,13 @@
                                     </select>
                                 </div>
                             </div>
+                            ${(!userProfile.isAdmin && managerSectors.length > 1) ? `
+                            <div>
+                                <label for="recordSector" class="${lbl}">Setor do Registro</label>
+                                <select id="recordSector" required class="${inp}">
+                                    ${managerSectors.map(s => `<option value="${s}">${s}</option>`).join('')}
+                                </select>
+                            </div>` : ''}
                             <div id="section-gameCategory">
                                 <label for="gameCategory" class="${lbl}">Categoria do Jogo</label>
                                 <select id="gameCategory" required class="${inp}">
@@ -1678,6 +1780,9 @@
                 const qmType = document.getElementById('qmType').value;
                 const employeeId = document.getElementById('employee').value;
                 const notes = document.getElementById('notes').value;
+                const recordSector = (!userProfile.isAdmin && managerSectors.length > 1)
+                    ? (document.getElementById('recordSector')?.value || managerSectors[0] || '')
+                    : (managerSectors[0] || userProfile.sector || '');
 
                 if (eventType === 'outros' && !notes.trim()) {
                     showNotification('Para "Outros Eventos" o campo Observações é obrigatório.', 'error');
@@ -1728,7 +1833,8 @@
                     qmValue: qmResult.value,
                     employeeId,
                     employeeName,
-                    notes
+                    notes,
+                    sector: recordSector
                 };
 
                 // Validação de duplicidade
@@ -1780,11 +1886,10 @@
             });
         }
 
-        // Função para gerar e baixar o modelo de planilha Excel
+        // Função para gerar e baixar o modelo de planilha Excel (Jogos e Outros unificados)
         function downloadExcelTemplate() {
             if (typeof XLSX === 'undefined') {
                 showNotification("Erro: Biblioteca de exportação XLSX não carregada.", "error");
-                console.error("XLSX library (SheetJS) not found. Make more details in console");
                 return;
             }
             if (!userProfile) {
@@ -1792,47 +1897,79 @@
                 return;
             }
 
-            const headers = ["Nome do Evento", "Data do Evento", "Horário do Jogo", "Categoria do Jogo", "Tipo QM", "Funcionário", "Observações"];
-            const mainSheetName = "Registros";
-            const listsSheetName = "Listas"; // Name for the lists sheet
+            // Colunas unificadas para Jogo e Outros
+            const headers = [
+                "Tipo de Evento",
+                "Nome do Evento",
+                "Data do Evento",
+                "Horário do Evento",
+                "Categoria do Jogo",
+                "Tipo QM",
+                "Funcionário",
+                "Observações"
+            ];
 
-            // Filter employees by manager's sector if not admin, otherwise get all
+            const managerSectors = getUserSectors(userProfile);
             const employeesForLists = (userProfile.isAdmin
-                ? globalData.employees.map(emp => emp.name)
-                : globalData.employees.filter(emp => emp.sector === userProfile.sector).map(emp => emp.name))
+                ? globalData.employees
+                : globalData.employees.filter(emp => getEmployeeSectors(emp).some(s => managerSectors.includes(s))))
+                .map(emp => emp.name)
                 .concat('Outros');
 
-            // Create workbook and main sheet
             const workbook = XLSX.utils.book_new();
-            // Main sheet: Row 1 has headers. No data in subsequent rows.
-            const ws = XLSX.utils.aoa_to_sheet([headers]);
 
-            // Create lists sheet with employees, game times and game categories
+            // Aba Registros (principal)
+            const ws = XLSX.utils.aoa_to_sheet([headers]);
+            XLSX.utils.book_append_sheet(workbook, ws, "Registros");
+
+            // Aba Listas (referência para dropdowns)
+            const eventTypes = ['Jogo', 'Outros'];
             const qmTypes = ['A', 'B'];
-            const maxRows = Math.max(employeesForLists.length, GAME_TIMES.length, GAME_CATEGORIES.length, qmTypes.length);
-            const listsData = [["Funcionários", "Horários", "Categorias do Jogo", "Tipo QM"]];
+            const maxRows = Math.max(employeesForLists.length, GAME_TIMES.length, GAME_CATEGORIES.length, qmTypes.length, eventTypes.length);
+            const listsData = [["Tipos de Evento", "Funcionários", "Horários", "Categorias do Jogo (só para Jogo)", "Tipo QM"]];
             for (let i = 0; i < maxRows; i++) {
-                listsData.push([employeesForLists[i] || '', GAME_TIMES[i] || '', GAME_CATEGORIES[i] || '', qmTypes[i] || '']);
+                listsData.push([
+                    eventTypes[i] || '',
+                    employeesForLists[i] || '',
+                    GAME_TIMES[i] || '',
+                    GAME_CATEGORIES[i] || '',
+                    qmTypes[i] || ''
+                ]);
             }
             const wsLists = XLSX.utils.aoa_to_sheet(listsData);
+            XLSX.utils.book_append_sheet(workbook, wsLists, "Listas");
 
-            // No data validations or dropdowns are added to the main sheet.
-            // This ensures the main sheet is clean as requested.
-
-            // Add sheets to workbook
-            XLSX.utils.book_append_sheet(workbook, ws, mainSheetName);
-            XLSX.utils.book_append_sheet(workbook, wsLists, listsSheetName);
-
-            // Explicitly set the visibility of the "Listas" sheet to visible (not hidden)
-            if (!workbook.Workbook) workbook.Workbook = {};
-            if (!workbook.Workbook.Sheets) workbook.Workbook.Sheets = [];
-
-            // Find the Lists sheet and ensure it's not hidden.
-            const listsSheetIdx = workbook.SheetNames.indexOf(listsSheetName);
-            if (listsSheetIdx !== -1 && workbook.Workbook.Sheets[listsSheetIdx]) {
-                delete workbook.Workbook.Sheets[listsSheetIdx].Hidden; // Ensure it's not hidden
-            }
-
+            // Aba Tutorial
+            const tutorialData = [
+                ["TUTORIAL DE PREENCHIMENTO — PORTAL QUADRO MÓVEL"],
+                [""],
+                ["Esta planilha é usada para importar registros de QM (Quadro Móvel) em lote."],
+                ["Preencha a aba 'Registros' e consulte a aba 'Listas' para os valores válidos."],
+                [""],
+                ["DESCRIÇÃO DAS COLUNAS:"],
+                [""],
+                ["Coluna", "Descrição", "Obrigatório?", "Valores Aceitos"],
+                ["Tipo de Evento", "Tipo: Jogo ou outro evento", "Sim", "Jogo / Outros  (ver aba Listas)"],
+                ["Nome do Evento", "Nome do jogo ou evento", "Sim", "Texto livre"],
+                ["Data do Evento", "Data de realização", "Sim", "DD/MM/AAAA  ou  AAAA-MM-DD"],
+                ["Horário do Evento", "Horário de início em intervalos de 15 min", "Sim", "Ex: 18:00 / 20:30 / 21:00  (ver aba Listas)"],
+                ["Categoria do Jogo", "Categoria — somente quando Tipo = Jogo", "Se Jogo: Sim. Se Outros: deixar em branco", "Ver aba Listas"],
+                ["Tipo QM", "Classificação do funcionário: A ou B", "Sim", "A  ou  B  (ver aba Listas)"],
+                ["Funcionário", "Nome do funcionário conforme cadastro no sistema", "Sim", "Ver aba Listas  (ou 'Outros' para externos)"],
+                ["Observações", "Campo de observações adicionais", "Obrigatório se Tipo = Outros", "Texto livre"],
+                [""],
+                ["REGRAS IMPORTANTES:"],
+                [""],
+                ["1. Para Tipo de Evento = 'Jogo': preencha a Categoria do Jogo."],
+                ["2. Para Tipo de Evento = 'Outros': deixe Categoria em branco e preencha Observações."],
+                ["3. Observações é OBRIGATÓRIO quando Tipo de Evento = 'Outros'."],
+                ["4. O Horário deve estar em intervalos exatos de 15 minutos (ex: 00:00, 00:15, 00:30...)."],
+                ["5. Use exatamente o nome do funcionário conforme listado na aba Listas."],
+                ["   Para funcionários externos, coloque 'Outros' no Funcionário e informe o nome nas Observações."],
+                ["6. Arquivos aceitos: .xlsx, .xls, .csv"]
+            ];
+            const wsTutorial = XLSX.utils.aoa_to_sheet(tutorialData);
+            XLSX.utils.book_append_sheet(workbook, wsTutorial, "Tutorial");
 
             XLSX.writeFile(workbook, "modelo_quadro_movel.xlsx");
             showNotification("Modelo de planilha baixado com sucesso!", "success");
@@ -1857,9 +1994,12 @@
                                 <button id="btn-back-dashboard-import" class="px-3.5 py-2 text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg transition-colors">← Voltar</button>
                             </div>
                         </div>
-                        <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-5 text-xs text-blue-800 leading-relaxed">
-                            <p class="font-semibold mb-1">Colunas esperadas na planilha:</p>
-                            <p><code class="bg-blue-100 px-1.5 py-0.5 rounded font-mono">Nome do Evento</code> · <code class="bg-blue-100 px-1.5 py-0.5 rounded font-mono">Data do Evento</code> (AAAA-MM-DD ou DD/MM/AAAA) · <code class="bg-blue-100 px-1.5 py-0.5 rounded font-mono">Horário do Jogo</code> · <code class="bg-blue-100 px-1.5 py-0.5 rounded font-mono">Categoria do Jogo</code> · <code class="bg-blue-100 px-1.5 py-0.5 rounded font-mono">Funcionário</code> · <code class="bg-blue-100 px-1.5 py-0.5 rounded font-mono">Observações</code></p>
+                        <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-5 text-xs text-blue-800 leading-relaxed space-y-2">
+                            <p class="font-semibold">Planilha unificada — Jogos e Outros Eventos</p>
+                            <p>Colunas: <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Tipo de Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Nome do Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Data do Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Horário do Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Categoria do Jogo</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Tipo QM</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Funcionário</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Observações</code></p>
+                            <p>• <strong>Tipo de Evento = "Jogo":</strong> preencha a Categoria do Jogo; Observações é opcional.</p>
+                            <p>• <strong>Tipo de Evento = "Outros":</strong> deixe Categoria em branco; Observações é <strong>obrigatório</strong>.</p>
+                            <p>Baixe o modelo para ver a aba <strong>Tutorial</strong> com instruções completas e a aba <strong>Listas</strong> com os valores válidos.</p>
                         </div>
                         <div class="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center">
                             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5" class="mx-auto mb-3"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -1906,12 +2046,16 @@
                     const sheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[sheetName];
 
-                    // Read all rows to get headers from the first row.
+                    // Lê cabeçalhos e normaliza nomes legados
                     const allRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                    const headers = allRows[0].map(h => String(h).trim());
+                    const rawHeaders = allRows[0].map(h => String(h).trim());
+                    const headerNormMap = { 'Horário do Jogo': 'Horário do Evento' };
+                    const headers = rawHeaders.map(h => headerNormMap[h] || h);
 
-                    const expectedHeaders = ["Nome do Evento", "Data do Evento", "Horário do Jogo", "Categoria do Jogo", "Funcionário", "Observações"];
-                    const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+                    // Cabeçalhos obrigatórios mínimos (Tipo de Evento é opcional para backward compat)
+                    const requiredHeaders = ["Nome do Evento", "Data do Evento", "Horário do Evento", "Tipo QM", "Funcionário"];
+                    // Aceita também o cabeçalho legado "Horário do Jogo" (já normalizado acima)
+                    const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
 
                     if (missingHeaders.length > 0) {
                         showNotification(`Cabeçalhos ausentes: ${missingHeaders.join(', ')}. Verifique sua planilha.`, "error");
@@ -1920,90 +2064,99 @@
                         return;
                     }
 
-                    // Start parsing data from the 2nd row (index 1) of the Excel sheet,
-                    // and use `raw: false` to attempt to convert dates to strings.
-                    // header: 1 means the 1st row (index 0) contains headers.
-                    // range: 1 means start reading data from the 2nd row (index 1).
                     const recordsRaw = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 1, raw: false });
 
-                    // Manually map `recordsRaw` to objects using the `headers` from Excel row 1.
                     const recordsToProcess = recordsRaw.map(row => {
                         const newRecord = {};
                         headers.forEach((header, index) => {
-                            // Ensure value is converted to string before trimming,
-                            // handling potential undefined/null values robustly.
                             newRecord[header.trim()] = (row[index] !== undefined && row[index] !== null) ? String(row[index]).trim() : '';
                         });
                         return newRecord;
-                    }).filter(record => Object.values(record).some(value => value !== undefined && value !== '')); // Remove entirely empty rows
+                    }).filter(record => Object.values(record).some(value => value !== undefined && value !== ''));
 
 
                     let recordsToAdd = [];
                     let duplicateRecords = [];
                     let errorsBeforeImport = [];
+                    const importManagerSectors = getUserSectors(userProfile);
 
-                    // Step 1: Pre-validation and identification of duplicates
+                    // Step 1: Pre-validação e identificação de duplicatas
                     for (const record of recordsToProcess) {
-                        // rowNum needs to account for skipped header (1) + current row index (0-based) + 1
                         const rowNum = recordsToProcess.indexOf(record) + 2;
                         try {
+                            // Tipo de Evento: default "Jogo" para planilhas antigas sem essa coluna
+                            const eventTypeRaw = (record["Tipo de Evento"] || 'Jogo').trim();
+                            const isJogo = eventTypeRaw.toLowerCase() === 'jogo';
+                            const isOutros = eventTypeRaw.toLowerCase() === 'outros';
+                            if (!isJogo && !isOutros) {
+                                throw new Error(`Tipo de Evento "${eventTypeRaw}" inválido. Use "Jogo" ou "Outros".`);
+                            }
+                            const eventType = isJogo ? 'jogo' : 'outros';
+
                             const eventName = record["Nome do Evento"];
-                            const eventDateRaw = record["Data do Evento"]; // This is now already a string thanks to raw:false and String() conversion
-                            const gameTimeRaw = record["Horário do Jogo"];
-                            const gameCategory = record["Categoria do Jogo"];
+                            const eventDateRaw = record["Data do Evento"];
+                            const gameTimeRaw = record["Horário do Evento"];
+                            const gameCategory = (record["Categoria do Jogo"] || '').trim();
                             const employeeName = record["Funcionário"];
                             const notes = record["Observações"] || '';
 
-                            if (!eventName || !eventDateRaw || !gameTimeRaw || !gameCategory || !employeeName) {
-                                throw new Error("Campos obrigatórios (Nome do Evento, Data do Evento, Horário do Jogo, Categoria do Jogo, Funcionário) não podem estar vazios.");
+                            if (!eventName || !eventDateRaw || !gameTimeRaw || !employeeName) {
+                                throw new Error("Campos obrigatórios (Nome do Evento, Data do Evento, Horário do Evento, Funcionário) não podem estar vazios.");
                             }
 
-                            // Valida horário do jogo
+                            // Validações condicionais por tipo
+                            if (isJogo) {
+                                if (!gameCategory) throw new Error("Para eventos do tipo 'Jogo', a Categoria do Jogo é obrigatória.");
+                                if (!GAME_CATEGORIES.includes(gameCategory)) {
+                                    throw new Error(`Categoria "${gameCategory}" inválida. Use uma das categorias disponíveis na aba Listas.`);
+                                }
+                            }
+                            if (isOutros && !notes.trim()) {
+                                throw new Error("Para eventos do tipo 'Outros', o campo Observações é obrigatório.");
+                            }
+
+                            // Valida horário
                             if (!GAME_TIMES.includes(gameTimeRaw.trim())) {
-                                throw new Error(`Horário '${gameTimeRaw}' inválido. Use o formato HH:MM em intervalos de 15 minutos (ex: 18:00, 20:30).`);
+                                throw new Error(`Horário "${gameTimeRaw}" inválido. Use HH:MM em intervalos de 15 minutos (ex: 18:00, 20:30).`);
                             }
                             const gameTime = gameTimeRaw.trim();
 
-                            // Valida categoria do jogo
-                            if (!GAME_CATEGORIES.includes(gameCategory.trim())) {
-                                throw new Error(`Categoria '${gameCategory}' inválida. Use uma das categorias disponíveis na aba Listas.`);
-                            }
-
-                            // Validação e formatação da data do evento
+                            // Validação e formatação da data
                             let eventDate;
-                            // Check if eventDateRaw is a number (Excel serial date) and convert it
                             if (typeof eventDateRaw === 'number') {
                                 const dateObj = XLSX.SSF.parse_date_code(eventDateRaw);
                                 eventDate = `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
-                            } else if (eventDateRaw.match(/^\d{4}-\d{2}-\d{2}$/)) { // AAAA-MM-DD
+                            } else if (eventDateRaw.match(/^\d{4}-\d{2}-\d{2}$/)) {
                                 eventDate = eventDateRaw;
-                            } else if (eventDateRaw.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) { // M/D/YYYY or MM/DD/YYYY
-                                const parts = eventDateRaw.split('/');
-                                eventDate = `${parts[2]}-${String(parts[0]).padStart(2, '0')}-${String(parts[1]).padStart(2, '0')}`; // Assuming M/D/YYYY
-                            } else if (eventDateRaw.match(/^\d{1,2}\/\d{1,2}\/\d{2}$/)) { // M/D/YY or MM/DD/YY
-                                const parts = eventDateRaw.split('/');
-                                const year = parseInt(parts[2], 10) + 2000; // Assuming 2000+ for 2-digit years
-                                eventDate = `${year}-${String(parts[0]).padStart(2, '0')}-${String(parts[1]).padStart(2, '0')}`; // Assuming M/D/YY
                             } else if (eventDateRaw.match(/^\d{2}\/\d{2}\/\d{4}$/)) { // DD/MM/YYYY
                                 const parts = eventDateRaw.split('/');
-                                eventDate = `${parts[2]}-${parts[1]}-${parts[0]}`; // Convert to AAAA-MM-DD
+                                eventDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                            } else if (eventDateRaw.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) { // M/D/YYYY
+                                const parts = eventDateRaw.split('/');
+                                eventDate = `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
+                            } else if (eventDateRaw.match(/^\d{1,2}\/\d{1,2}\/\d{2}$/)) { // M/D/YY
+                                const parts = eventDateRaw.split('/');
+                                const year = parseInt(parts[2], 10) + 2000;
+                                eventDate = `${year}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
                             } else {
-                                throw new Error(`Formato de data inválido para 'Data do Evento': ${eventDateRaw}. Use AAAA-MM-DD, DD/MM/AAAA ou M/D/AA(AAAA).`);
+                                throw new Error(`Formato de data inválido: "${eventDateRaw}". Use DD/MM/AAAA ou AAAA-MM-DD.`);
                             }
-
 
                             let employeeId; let finalEmployeeName; let foundEmployee = null;
                             if (employeeName.toLowerCase() === 'outros') {
                                 if (!notes.trim()) {
-                                    throw new Error("Funcionário marcado como 'Outros', mas 'Observações' está vazio. Informe o nome completo do funcionário.");
+                                    throw new Error("Funcionário 'Outros' requer o nome completo no campo Observações.");
                                 }
                                 employeeId = 'OUTROS';
                                 finalEmployeeName = notes.trim();
                             } else {
-                                const employeesInSector = userProfile.isAdmin ? globalData.employees : globalData.employees.filter(emp => emp.sector === userProfile.sector);
+                                const employeesInSector = userProfile.isAdmin
+                                    ? globalData.employees
+                                    : globalData.employees.filter(emp => getEmployeeSectors(emp).some(s => importManagerSectors.includes(s)));
                                 foundEmployee = employeesInSector.find(emp => emp.name?.toLowerCase() === employeeName.toLowerCase());
                                 if (!foundEmployee) {
-                                    throw new Error(`Funcionário '${employeeName}' não encontrado ou não pertence ao seu setor ('${userProfile.sector}').`);
+                                    const sectorDesc = userProfile.isAdmin ? '' : ` (setores: ${importManagerSectors.join(', ')})`;
+                                    throw new Error(`Funcionário "${employeeName}" não encontrado${sectorDesc}.`);
                                 }
                                 employeeId = foundEmployee.id;
                                 finalEmployeeName = foundEmployee.name;
@@ -2017,7 +2170,8 @@
                                 eventName,
                                 eventDate,
                                 gameTime,
-                                gameCategory: gameCategory.trim(),
+                                eventType,
+                                gameCategory,
                                 qmClassification: qmResult.classification,
                                 qmValue: qmResult.value,
                                 employeeId,
@@ -2181,7 +2335,7 @@
                         <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${record.sector || '-'}</td>
                         <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${record.managerName || '-'}</td>
                         <td class="text-xs text-slate-500" style="padding:10px 16px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${record.notes || ''}">${record.notes || '—'}</td>
-                        ${(userProfile.isManager && record.sector === userProfile.sector && !userProfile.isAdmin && record.managerId === currentUser.uid) || userProfile.isAdmin ?
+                        ${(userProfile.isManager && getUserSectors(userProfile).includes(record.sector) && !userProfile.isAdmin && record.managerId === currentUser.uid) || userProfile.isAdmin ?
                             `<td class="text-center" style="padding:10px 16px">
                                 <button class="btn-delete-record text-slate-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors" data-id="${record.id}" title="Excluir">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -2197,7 +2351,7 @@
                         <p class="text-slate-500 text-sm font-medium">Nenhum registro encontrado</p>
                         <p class="text-slate-400 text-xs mt-1">Ajuste os filtros para ver resultados</p>
                     </div>` :
-                    `<div class="overflow-x-auto border border-slate-100 rounded-xl">
+                    `<div class="tbl-scroll-wrap border border-slate-100 rounded-xl">
                         <table class="tbl min-w-full">
                             <thead>
                                 <tr>
@@ -2693,7 +2847,7 @@
                         data = data.filter(emp => (emp.name || '').toLowerCase().includes(term) || (emp.registration || '').toLowerCase().includes(term));
                     }
                     if (employeeFilterState.sector) {
-                        data = data.filter(emp => emp.sector === employeeFilterState.sector);
+                        data = data.filter(emp => getEmployeeSectors(emp).includes(employeeFilterState.sector));
                     }
                     return data;
                 };
@@ -2722,7 +2876,18 @@
             const tableHeaders = fields.map(f => `<th>${f.label}</th>`).join('');
             const tableRows = itemsToDisplay.map(item => `
                 <tr class="tbl-row">
-                    ${fields.map(field => `<td class="whitespace-nowrap" style="padding:10px 16px">${field.type === 'date' && item[field.name] ? new Date(item[field.name] + 'T00:00:00').toLocaleDateString('pt-BR') : (item[field.name] || '—')}</td>`).join('')}
+                    ${fields.map(field => {
+                        let cellVal;
+                        if (field.type === 'multiselect-sectors') {
+                            const secs = getEmployeeSectors(item);
+                            cellVal = secs.length > 0 ? secs.join(', ') : '—';
+                        } else if (field.type === 'date' && item[field.name]) {
+                            cellVal = new Date(item[field.name] + 'T00:00:00').toLocaleDateString('pt-BR');
+                        } else {
+                            cellVal = item[field.name] || '—';
+                        }
+                        return `<td style="padding:10px 16px;max-width:220px;overflow:hidden;text-overflow:ellipsis">${cellVal}</td>`;
+                    }).join('')}
                     <td class="text-xs text-slate-500 whitespace-nowrap" style="padding:10px 16px">${item.createdAt?.toDate?.().toLocaleDateString('pt-BR') || '—'}</td>
                     <td class="whitespace-nowrap" style="padding:10px 16px">
                         <div class="flex items-center gap-1">
@@ -2762,7 +2927,7 @@
                             <p class="text-slate-500 text-sm font-medium">Nenhum registro cadastrado</p>
                             <p class="text-slate-400 text-xs mt-1">Clique em "Adicionar" para criar o primeiro</p>
                         </div>` :
-                        `<div class="overflow-x-auto">
+                        `<div class="tbl-scroll-wrap">
                             <table class="tbl min-w-full">
                                 <thead><tr>${tableHeaders}<th>Criado em</th><th>Ações</th></tr></thead>
                                 <tbody>${tableRows}</tbody>
@@ -2779,9 +2944,18 @@
                 fields.forEach(field => {
                     const value = itemToEdit ? (itemToEdit[field.name] || '') : '';
                     const fieldId = `field-${field.name}`;
-                    if (field.type === 'select') {
+                    if (field.type === 'multiselect-sectors') {
+                        const currentSectors = getEmployeeSectors(itemToEdit || {});
+                        const checkboxesHtml = (field.options || []).map(opt =>
+                            `<label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1 rounded hover:bg-slate-50">
+                                <input type="checkbox" class="sectors-check h-4 w-4 text-blue-600 border-slate-300 rounded" value="${opt.value}" ${currentSectors.includes(opt.value) ? 'checked' : ''}>
+                                ${opt.label}
+                            </label>`
+                        ).join('');
+                        formHtml += `<div class="mb-4"><label class="${lbl}">${field.label}</label><div class="max-h-40 overflow-y-auto p-2 border border-slate-200 rounded-lg space-y-0.5">${checkboxesHtml || '<p class="text-xs text-slate-400 p-2">Nenhum departamento cadastrado</p>'}</div></div>`;
+                    } else if (field.type === 'select') {
                         const optionsHtml = field.options.map(opt => `<option value="${opt.value}" ${value === opt.value ? 'selected' : ''}>${opt.label}</option>`).join('');
-                        formHtml += `<div class="mb-4"><label for="${fieldId}" class="${lbl}">${field.label}</label><select id="${fieldId}" name="${field.name}" class="${inputBaseClass}" required><option value="">Selecione</option>${optionsHtml}</select></div>`;
+                        formHtml += `<div class="mb-4"><label for="${fieldId}" class="${lbl}">${field.label}</label><select id="${fieldId}" name="${field.name}" class="${inputBaseClass}"><option value="">Selecione</option>${optionsHtml}</select></div>`;
                     } else {
                         formHtml += `<div class="mb-4"><label for="${fieldId}" class="${lbl}">${field.label}</label><input type="${field.type || 'text'}" id="${fieldId}" name="${field.name}" value="${value}" class="${inputBaseClass}" required></div>`;
                     }
@@ -2798,11 +2972,16 @@
                     }
 
                     fields.forEach(field => {
-                        const inputElement = document.getElementById(`field-${field.name}`);
-                        if (inputElement) {
-                            formData[field.name] = inputElement.value;
+                        if (field.type === 'multiselect-sectors') {
+                            const checked = document.querySelectorAll('.sectors-check:checked');
+                            const selectedSectors = Array.from(checked).map(cb => cb.value);
+                            formData.sectors = selectedSectors;
+                            formData.sector = selectedSectors[0] || '';
                         } else {
-                            console.warn(`Elemento do formulário não encontrado para o campo: field-${field.name}`);
+                            const inputElement = document.getElementById(`field-${field.name}`);
+                            if (inputElement) {
+                                formData[field.name] = inputElement.value;
+                            }
                         }
                     });
 
@@ -2825,7 +3004,7 @@
                 };
 
                 openModal(modalTitle,
-                    `<form id="item-form" class="space-y-1">${formHtml.replace(/class="mb-4"(?![\s\S]*class="mb-4")/g, '')}</form>`,
+                    `<form id="item-form" class="space-y-1">${formHtml}</form>`,
                     asyncOperation,
                     itemToEdit ? 'Salvar Alterações' : 'Adicionar'
                 );
@@ -2840,7 +3019,11 @@
             }));
             document.querySelectorAll('.btn-delete-item').forEach(btn => btn.addEventListener('click', (e) => {
                 const itemId = e.currentTarget.dataset.id;
-                deleteItemFromFirestore(collectionKey, itemId);
+                if (typeof onDelete === 'function') {
+                    onDelete(itemId);
+                } else {
+                    deleteItemFromFirestore(collectionKey, itemId);
+                }
             }));
 
             if (collectionKey === 'employees') {
@@ -2865,7 +3048,13 @@
         function renderAdminCreateUserProfilePage(userToEdit = null) {
             const isCreating = !userToEdit;
             const cdn = collectionDisplayName('users_profile');
-            const sectorsOptionsHtml = globalData.sectors.map(s => `<option value="${s.name}" ${userToEdit?.sector === s.name ? 'selected' : ''}>${s.name}</option>`).join('');
+            const userCurrentSectors = getUserSectors(userToEdit || {});
+            const sectorsCheckboxesHtml = globalData.sectors.map(s =>
+                `<label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1.5 rounded hover:bg-slate-50">
+                    <input type="checkbox" class="user-sector-check h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500" value="${s.name}" ${userCurrentSectors.includes(s.name) ? 'checked' : ''}>
+                    ${s.name}
+                </label>`
+            ).join('') || '<p class="text-xs text-slate-400 p-2">Nenhum departamento cadastrado</p>';
             const inp = `w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all`;
             const inputBaseClass = inp;
             const checkboxClass = "h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500";
@@ -2895,11 +3084,12 @@
                                 <div><label for="userProfilePasswordConfirm" class="${lbl}">Confirmar</label><input type="password" id="userProfilePasswordConfirm" class="${inp}" required placeholder="Repita a senha"></div>
                             </div>
                             ` : ''}
-                            <div><label for="userProfileSector" class="${lbl}">Setor</label>
-                                 <select id="userProfileSector" class="${inp}">
-                                     <option value="" ${!(userToEdit?.sector) ? 'selected': ''}>Nenhum</option>
-                                     ${sectorsOptionsHtml}
-                                 </select></div>
+                            <div>
+                                <label class="${lbl}">Departamentos</label>
+                                <div class="max-h-40 overflow-y-auto p-2 border border-slate-200 rounded-lg space-y-0.5" id="userSectorsContainer">
+                                    ${sectorsCheckboxesHtml}
+                                </div>
+                            </div>
                             <div class="grid grid-cols-2 gap-4 pt-1">
                                 <label class="flex items-center gap-2.5 text-sm text-slate-700 cursor-pointer">
                                     <input type="checkbox" id="userProfileIsManager" ${userToEdit?.isManager ? 'checked' : ''} class="${checkboxClass}">
@@ -2970,9 +3160,11 @@
                 }
 
                 const isManagerChecked = document.getElementById('userProfileIsManager').checked;
-                const sectorValue = document.getElementById('userProfileSector').value;
-                if (isManagerChecked && (!sectorValue || sectorValue.trim() === '')) {
-                    showNotification('Um gestor deve ter um setor definido.', 'error');
+                const sectorCheckboxes = document.querySelectorAll('.user-sector-check:checked');
+                const selectedSectors = Array.from(sectorCheckboxes).map(cb => cb.value);
+
+                if (isManagerChecked && selectedSectors.length === 0) {
+                    showNotification('Um gestor deve ter pelo menos um departamento definido.', 'error');
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalButtonText;
                     return;
@@ -2981,7 +3173,8 @@
                 const profileData = {
                     name: document.getElementById('userProfileName').value,
                     email: email,
-                    sector: sectorValue,
+                    sectors: selectedSectors,
+                    sector: selectedSectors[0] || '',
                     isManager: isManagerChecked,
                     isAdmin: document.getElementById('userProfileIsAdmin').checked,
                     uid: uid
@@ -3024,7 +3217,7 @@
                         </div>
                     </td>
                     <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${user.email}</td>
-                    <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${user.sector || '—'}</td>
+                    <td class="text-xs text-slate-600" style="padding:10px 16px;max-width:180px;overflow:hidden;text-overflow:ellipsis" title="${getUserSectors(user).join(', ')}">${getUserSectors(user).join(', ') || '—'}</td>
                     <td class="whitespace-nowrap" style="padding:10px 16px">${user.isManager ? '<span style="display:inline-flex;align-items:center;padding:1px 8px;border-radius:4px;font-size:11px;font-weight:700;background:var(--apple-bg);color:var(--apple-text);border:1px solid var(--apple-border)">Sim</span>' : '<span style="display:inline-flex;align-items:center;padding:1px 8px;border-radius:4px;font-size:11px;font-weight:600;color:var(--apple-3rd)">Não</span>'}</td>
                     <td class="whitespace-nowrap" style="padding:10px 16px">${user.isAdmin ? '<span style="display:inline-flex;align-items:center;padding:1px 8px;border-radius:4px;font-size:11px;font-weight:700;background:var(--apple-bg);color:var(--apple-blue);border:1px solid rgba(0,113,227,.15)">Sim</span>' : '<span style="display:inline-flex;align-items:center;padding:1px 8px;border-radius:4px;font-size:11px;font-weight:600;color:var(--apple-3rd)">Não</span>'}</td>
                     <td class="whitespace-nowrap" style="padding:10px 16px">
@@ -3101,10 +3294,11 @@
             if (!records || records.length === 0) {
                 showNotification("Nenhum dado para exportar.", "info"); return;
             }
-            const headers = ["Data Criação", "Evento", "Data Evento", "Horário", "Cat. Jogo", "QM", "Valor QM", "Funcionário", "Setor", "Gestor Lançador", "Observações"];
+            const headers = ["Data Criação", "Evento", "Data Evento", "Horário", "Cat. Jogo", "QM", "Valor QM", "Chapa", "Funcionário", "Setor", "Gestor Lançador", "Observações"];
             let csvContent = headers.join(",") + "\\n";
 
             records.forEach(record => {
+                const empChapa = globalData.employees.find(e => e.id === record.employeeId)?.registration || '-';
                 const row = [
                     record.createdAt?.toDate?.().toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}) || 'N/A',
                     `"${(record.eventName || 'N/A').replace(/"/g, '""')}"`,
@@ -3113,6 +3307,7 @@
                     `"${(record.gameCategory || record.categoryName || 'N/A').replace(/"/g, '""')}"`,
                     record.qmClassification || '-',
                     record.qmValue ? `R$ ${record.qmValue}` : '-',
+                    `"${empChapa}"`,
                     `"${(record.employeeName || 'N/A').replace(/"/g, '""')}"`,
                     `"${(record.sector || 'N/A').replace(/"/g, '""')}"`,
                     `"${(record.managerName || 'N/A').replace(/"/g, '""')}"`,
@@ -3142,19 +3337,23 @@
                 showNotification("Nenhum dado para exportar.", "info"); return;
             }
 
-            const dataForSheet = records.map(record => ({
-                "Data Criação": record.createdAt?.toDate?.().toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}) || 'N/A',
-                "Evento": record.eventName || 'N/A',
-                "Data Evento": record.eventDate ? new Date(record.eventDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A',
-                "Horário": record.gameTime || '-',
-                "Cat. Jogo": record.gameCategory || record.categoryName || 'N/A',
-                "QM": record.qmClassification || '-',
-                "Valor QM": record.qmValue ? `R$ ${record.qmValue}` : '-',
-                "Funcionário": record.employeeName || 'N/A',
-                "Setor": record.sector || 'N/A',
-                "Gestor Lançador": record.managerName || 'N/A',
-                "Observações": record.notes || '-'
-            }));
+            const dataForSheet = records.map(record => {
+                const empChapa = globalData.employees.find(e => e.id === record.employeeId)?.registration || '-';
+                return {
+                    "Data Criação": record.createdAt?.toDate?.().toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}) || 'N/A',
+                    "Evento": record.eventName || 'N/A',
+                    "Data Evento": record.eventDate ? new Date(record.eventDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A',
+                    "Horário": record.gameTime || '-',
+                    "Cat. Jogo": record.gameCategory || record.categoryName || 'N/A',
+                    "QM": record.qmClassification || '-',
+                    "Valor QM": record.qmValue ? `R$ ${record.qmValue}` : '-',
+                    "Chapa": empChapa,
+                    "Funcionário": record.employeeName || 'N/A',
+                    "Setor": record.sector || 'N/A',
+                    "Gestor Lançador": record.managerName || 'N/A',
+                    "Observações": record.notes || '-'
+                };
+            });
 
             const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
             const workbook = XLSX.utils.book_new();
