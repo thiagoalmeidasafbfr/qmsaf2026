@@ -2013,7 +2013,7 @@
             reader.onload = async (e) => {
                 try {
                     const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                     const sheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[sheetName];
 
@@ -2035,15 +2035,17 @@
                         return;
                     }
 
-                    const recordsRaw = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 1, raw: false });
+                    // raw: true preserva tipos nativos (Date para datas, number para frações de tempo)
+                    const recordsRaw = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 1, raw: true });
 
                     const recordsToProcess = recordsRaw.map(row => {
                         const newRecord = {};
                         headers.forEach((header, index) => {
-                            newRecord[header.trim()] = (row[index] !== undefined && row[index] !== null) ? String(row[index]).trim() : '';
+                            // Preserva tipos: Date, number, string — conversão feita por campo
+                            newRecord[header.trim()] = row[index] !== undefined && row[index] !== null ? row[index] : '';
                         });
                         return newRecord;
-                    }).filter(record => Object.values(record).some(value => value !== undefined && value !== ''));
+                    }).filter(record => Object.values(record).some(v => v !== '' && v !== undefined));
 
 
                     let recordsToAdd = [];
@@ -2056,7 +2058,7 @@
                         const rowNum = recordsToProcess.indexOf(record) + 2;
                         try {
                             // Tipo de Evento: default "Jogo" para planilhas antigas sem essa coluna
-                            const eventTypeRaw = (record["Tipo de Evento"] || 'Jogo').trim();
+                            const eventTypeRaw = String(record["Tipo de Evento"] || 'Jogo').trim();
                             const isJogo = eventTypeRaw.toLowerCase() === 'jogo';
                             const isOutros = eventTypeRaw.toLowerCase() === 'outros';
                             if (!isJogo && !isOutros) {
@@ -2064,14 +2066,51 @@
                             }
                             const eventType = isJogo ? 'jogo' : 'outros';
 
-                            const eventName = record["Nome do Evento"];
-                            const eventDateRaw = record["Data do Evento"];
-                            const gameTimeRaw = record["Horário do Evento"];
-                            const gameCategory = (record["Categoria do Jogo"] || '').trim();
-                            const employeeName = record["Funcionário"];
-                            const notes = record["Observações"] || '';
+                            const eventName = String(record["Nome do Evento"] || '').trim();
+                            const gameCategory = String(record["Categoria do Jogo"] || '').trim();
+                            const employeeName = String(record["Funcionário"] || '').trim();
+                            const notes = String(record["Observações"] || '').trim();
 
-                            if (!eventName || !eventDateRaw || !gameTimeRaw || !employeeName) {
+                            // --- Horário: aceita string "HH:MM", Date (cellDates) ou fração decimal ---
+                            let gameTime;
+                            const rawTime = record["Horário do Evento"];
+                            if (rawTime instanceof Date && !isNaN(rawTime)) {
+                                const h = String(rawTime.getUTCHours()).padStart(2, '0');
+                                const m = String(rawTime.getUTCMinutes()).padStart(2, '0');
+                                gameTime = `${h}:${m}`;
+                            } else if (typeof rawTime === 'number') {
+                                // fração decimal (0.7917 = 19:00)
+                                const totalMin = Math.round(rawTime * 24 * 60);
+                                gameTime = `${String(Math.floor(totalMin / 60) % 24).padStart(2,'0')}:${String(totalMin % 60).padStart(2,'0')}`;
+                            } else {
+                                gameTime = String(rawTime || '').trim();
+                            }
+
+                            // --- Data: aceita Date (cellDates), número serial ou string DD/MM/AAAA / AAAA-MM-DD ---
+                            let eventDate;
+                            const rawDate = record["Data do Evento"];
+                            if (rawDate instanceof Date && !isNaN(rawDate)) {
+                                const y = rawDate.getUTCFullYear();
+                                const m = String(rawDate.getUTCMonth() + 1).padStart(2, '0');
+                                const d = String(rawDate.getUTCDate()).padStart(2, '0');
+                                eventDate = `${y}-${m}-${d}`;
+                            } else if (typeof rawDate === 'number') {
+                                const dateObj = XLSX.SSF.parse_date_code(rawDate);
+                                eventDate = `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
+                            } else {
+                                const eventDateRaw = String(rawDate || '').trim();
+                                if (eventDateRaw.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                                    eventDate = eventDateRaw;
+                                } else if (eventDateRaw.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+                                    // DD/MM/YYYY ou D/M/YYYY — assume formato brasileiro
+                                    const parts = eventDateRaw.split('/');
+                                    eventDate = `${parts[2]}-${String(parts[1]).padStart(2,'0')}-${String(parts[0]).padStart(2,'0')}`;
+                                } else {
+                                    throw new Error(`Formato de data inválido: "${eventDateRaw}". Use DD/MM/AAAA ou AAAA-MM-DD.`);
+                                }
+                            }
+
+                            if (!eventName || !eventDate || !gameTime || !employeeName) {
                                 throw new Error("Campos obrigatórios (Nome do Evento, Data do Evento, Horário do Evento, Funcionário) não podem estar vazios.");
                             }
 
@@ -2087,30 +2126,8 @@
                             }
 
                             // Valida horário
-                            if (!GAME_TIMES.includes(gameTimeRaw.trim())) {
-                                throw new Error(`Horário "${gameTimeRaw}" inválido. Use HH:MM em intervalos de 15 minutos (ex: 18:00, 20:30).`);
-                            }
-                            const gameTime = gameTimeRaw.trim();
-
-                            // Validação e formatação da data
-                            let eventDate;
-                            if (typeof eventDateRaw === 'number') {
-                                const dateObj = XLSX.SSF.parse_date_code(eventDateRaw);
-                                eventDate = `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
-                            } else if (eventDateRaw.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                                eventDate = eventDateRaw;
-                            } else if (eventDateRaw.match(/^\d{2}\/\d{2}\/\d{4}$/)) { // DD/MM/YYYY
-                                const parts = eventDateRaw.split('/');
-                                eventDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
-                            } else if (eventDateRaw.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) { // M/D/YYYY
-                                const parts = eventDateRaw.split('/');
-                                eventDate = `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
-                            } else if (eventDateRaw.match(/^\d{1,2}\/\d{1,2}\/\d{2}$/)) { // M/D/YY
-                                const parts = eventDateRaw.split('/');
-                                const year = parseInt(parts[2], 10) + 2000;
-                                eventDate = `${year}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
-                            } else {
-                                throw new Error(`Formato de data inválido: "${eventDateRaw}". Use DD/MM/AAAA ou AAAA-MM-DD.`);
+                            if (!GAME_TIMES.includes(gameTime)) {
+                                throw new Error(`Horário "${gameTime}" inválido. Use HH:MM em intervalos de 15 minutos (ex: 18:00, 20:30).`);
                             }
 
                             let employeeId; let finalEmployeeName; let foundEmployee = null;
