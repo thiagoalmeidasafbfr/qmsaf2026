@@ -3408,9 +3408,30 @@
         }
 
         async function processEmployeesImport(rows, existingItems, statusArea, summaryText, errorsList) {
-            let added = 0, updated = 0, skipped = 0;
+            let added = 0, updated = 0, skipped = 0, sectorsCreated = 0;
             const errors = [];
+
+            // Coleta todos os departamentos únicos mencionados na planilha
+            const mentionedSectors = new Set();
+            rows.forEach(row => {
+                const raw = (row['Departamentos'] || row['departamentos'] || row['sectors'] || row['sector'] || '').toString().trim();
+                if (raw) raw.split(',').map(s => s.trim()).filter(Boolean).forEach(s => mentionedSectors.add(s));
+            });
+
+            // Cria automaticamente os setores que ainda não existem
+            const existingSectorNames = new Set(globalData.sectors.map(s => s.name.toLowerCase().trim()));
+            for (const sectorName of mentionedSectors) {
+                if (!existingSectorNames.has(sectorName.toLowerCase().trim())) {
+                    const { error } = await supabase.from('sectors').insert({ name: sectorName, created_by: currentUser.id });
+                    if (!error) { existingSectorNames.add(sectorName.toLowerCase().trim()); sectorsCreated++; }
+                    else errors.push(`Setor "${sectorName}" não pôde ser criado: ${error.message}`);
+                }
+            }
+            // Recarrega setores para garantir lista atualizada
+            const { data: freshSectors } = await supabase.from('sectors').select('*').order('name');
+            if (freshSectors) globalData.sectors = freshSectors.map(fromDB);
             const sectorNames = new Set(globalData.sectors.map(s => s.name.toLowerCase().trim()));
+
             for (let i = 0; i < rows.length; i++) {
                 const row = rows[i];
                 const name = (row['Nome'] || row['name'] || '').toString().trim();
@@ -3418,8 +3439,6 @@
                 const deptRaw = (row['Departamentos'] || row['departamentos'] || row['sectors'] || row['sector'] || '').toString().trim();
                 if (!name) { errors.push(`Linha ${i + 2}: Nome vazio, ignorado.`); skipped++; continue; }
                 const sectors = deptRaw ? deptRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
-                const invalidSectors = sectors.filter(s => !sectorNames.has(s.toLowerCase()));
-                if (invalidSectors.length) errors.push(`Linha ${i + 2} ("${name}"): Departamentos não encontrados: ${invalidSectors.join(', ')}`);
                 const validSectors = sectors.filter(s => sectorNames.has(s.toLowerCase()));
                 let existing = null;
                 if (registration) existing = existingItems.find(e => e.registration === registration);
@@ -3438,7 +3457,8 @@
             const { data: updatedEmps } = await supabase.from('employees').select('*').order('name');
             if (updatedEmps) globalData.employees = updatedEmps.map(fromDB);
             if (statusArea) {
-                summaryText.textContent = `Concluído: ${added} adicionados, ${updated} atualizados, ${skipped} ignorados.`;
+                const sectorNote = sectorsCreated > 0 ? ` (${sectorsCreated} departamento(s) criados automaticamente)` : '';
+                summaryText.textContent = `Concluído: ${added} adicionados, ${updated} atualizados, ${skipped} ignorados.${sectorNote}`;
                 errorsList.innerHTML = errors.map(e => `<p>${e}</p>`).join('');
                 statusArea.classList.remove('hidden');
             }
