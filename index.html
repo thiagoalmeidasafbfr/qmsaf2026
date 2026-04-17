@@ -570,13 +570,12 @@
 
         // Listener de autenticação do Supabase
         supabase.auth.onAuthStateChange(async (event, session) => {
-            // Ignora eventos de recuperação de senha (tratados separadamente)
-            if (event === 'PASSWORD_RECOVERY') return;
+            // Ignora eventos que não exigem re-inicialização da UI
+            if (event === 'PASSWORD_RECOVERY' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') return;
 
             hideElement(initialLoadingDiv);
 
             if (session?.user) {
-                // Shim de compatibilidade: expõe .uid igual ao Firebase
                 currentUser = { ...session.user, uid: session.user.id };
                 try {
                     const { data: profileData, error } = await supabase
@@ -597,17 +596,20 @@
                             await handleLogout();
                             return;
                         }
-                        await loadAllData(); // aguarda dados antes de renderizar
-                        return;             // renderApp() já chamado dentro de loadAllData
+                        await loadAllData();
+                        return;
                     } else {
                         showNotification("Perfil do usuário não encontrado. Contacte o administrador.", "error");
                         await handleLogout();
                         return;
                     }
                 } catch (err) {
-                    console.error("[onAuthStateChange] Erro ao buscar perfil:", err);
+                    console.error("[onAuthStateChange] Erro:", err);
                     showNotification("Erro ao carregar perfil. Tente novamente.", "error");
-                    await handleLogout();
+                    currentUser = null; userProfile = null;
+                    currentView = 'login';
+                    hideElement(appHeader); hideElement(appFooter);
+                    renderApp();
                     return;
                 }
             } else {
@@ -618,7 +620,7 @@
                 currentView = 'login';
                 clearAllDataAndUnsubscribe();
             }
-            renderApp(); // só chega aqui no caso de logout
+            renderApp();
         });
 
         // Função para lidar com o login de email/senha
@@ -735,28 +737,20 @@
             unsubscribers.push(() => supabase.removeChannel(channel));
         }
 
-        let _loadingData = false;
-
         // Carrega todos os dados iniciais e re-renderiza ao terminar
         async function loadAllData() {
-            if (_loadingData) return;          // evita chamadas concorrentes
-            _loadingData = true;
-            try {
-                clearAllDataAndUnsubscribe();
-                if (!userProfile) return;
-                const fetches = [
-                    fetchTableData('categories', 'categories'),
-                    fetchTableData('sectors', 'sectors'),
-                    fetchTableData('employees', 'employees'),
-                    fetchTableData('rules', 'rules'),
-                    fetchTableData('records', 'records'),
-                ];
-                if (userProfile.isAdmin) fetches.push(fetchTableData('users_profile', 'allUsers'));
-                await Promise.all(fetches);
-                renderApp();
-            } finally {
-                _loadingData = false;
-            }
+            clearAllDataAndUnsubscribe();
+            if (!userProfile) { renderApp(); return; }
+            const fetches = [
+                fetchTableData('categories', 'categories'),
+                fetchTableData('sectors', 'sectors'),
+                fetchTableData('employees', 'employees'),
+                fetchTableData('rules', 'rules'),
+                fetchTableData('records', 'records'),
+            ];
+            if (userProfile.isAdmin) fetches.push(fetchTableData('users_profile', 'allUsers'));
+            await Promise.all(fetches);
+            renderApp();
         }
 
         // Limpa dados globais e cancela todos os canais Supabase
