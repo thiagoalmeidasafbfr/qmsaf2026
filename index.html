@@ -557,15 +557,22 @@
             return out;
         }
 
-        // Cria um usuário no Supabase Auth usando instância secundária
-        // (não afeta a sessão atual do admin)
+        // Cria um usuário no Supabase Auth usando instância secundária isolada.
+        // O storage no-op garante que a sessão do admin não seja sobrescrita.
         async function createAuthUser(email, password) {
-            const tmp = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            const noopStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+            const tmp = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                auth: {
+                    storage: noopStorage,
+                    persistSession: false,
+                    autoRefreshToken: false,
+                    detectSessionInUrl: false,
+                    lock: async (_n, _t, fn) => fn(),
+                }
+            });
             const { data, error } = await tmp.auth.signUp({ email, password });
             if (error) throw error;
-            const uid = data.user.id;
-            await tmp.auth.signOut();
-            return uid;
+            return data.user.id;
         }
 
         // Mutex: evita chamadas simultâneas a handleUserSession
