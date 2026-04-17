@@ -568,10 +568,15 @@
             return uid;
         }
 
-        // Configura a sessão autenticada (usado tanto no carregamento inicial quanto no login)
+        // Mutex: evita chamadas simultâneas a handleUserSession
+        let _handlingSession = false;
+
+        // Configura a sessão autenticada (carregamento inicial e login)
         async function handleUserSession(session) {
-            currentUser = { ...session.user, uid: session.user.id };
+            if (_handlingSession) return;
+            _handlingSession = true;
             try {
+                currentUser = { ...session.user, uid: session.user.id };
                 const { data: profileData, error } = await supabase
                     .from('users_profile')
                     .select('*')
@@ -605,10 +610,12 @@
                 currentView = 'login';
                 hideElement(appHeader); hideElement(appFooter);
                 renderApp();
+            } finally {
+                _handlingSession = false;
             }
         }
 
-        // Inicialização: lê sessão existente diretamente (não depende de eventos)
+        // Inicialização: lê sessão do storage diretamente, sem depender de eventos
         async function initializeAuth() {
             try {
                 const { data: { session } } = await supabase.auth.getSession();
@@ -627,14 +634,13 @@
             }
         }
 
-        // Listener de autenticação — só reage a SIGNED_IN e SIGNED_OUT explícitos
-        supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN') {
-                hideElement(initialLoadingDiv);
-                await handleUserSession(session);
-            } else if (event === 'SIGNED_OUT') {
+        // Listener de autenticação — só reage a SIGNED_OUT
+        // SIGNED_IN é tratado diretamente pelo handleLogin para evitar dupla execução
+        supabase.auth.onAuthStateChange(async (event, _session) => {
+            if (event === 'SIGNED_OUT') {
                 currentUser = null;
                 userProfile = null;
+                _handlingSession = false;
                 hideElement(appHeader);
                 hideElement(appFooter);
                 currentView = 'login';
@@ -642,12 +648,23 @@
                 hideElement(initialLoadingDiv);
                 renderApp();
             }
-            // Ignora: INITIAL_SESSION, TOKEN_REFRESHED, USER_UPDATED, PASSWORD_RECOVERY
+            // INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED, PASSWORD_RECOVERY — ignorados
         });
 
-        // Dispara a inicialização
+        // Segurança: se após 15 s a tela de loading ainda estiver visível, força login
+        setTimeout(() => {
+            if (!initialLoadingDiv.classList.contains('hidden')) {
+                console.error('[init] Timeout de 15 s — forçando tela de login');
+                _handlingSession = false;
+                hideElement(initialLoadingDiv);
+                currentView = 'login';
+                renderApp();
+            }
+        }, 15000);
+
         initializeAuth().catch(err => {
             console.error('[init]', err);
+            _handlingSession = false;
             hideElement(initialLoadingDiv);
             currentView = 'login';
             renderApp();
@@ -657,9 +674,11 @@
         async function handleLogin(email, password) {
             appContent.innerHTML = `<div class="flex flex-col justify-center items-center h-64"><div class="loader"></div><p class="ml-3 text-gray-600 mt-3">Entrando...</p></div>`;
             try {
-                const { error } = await supabase.auth.signInWithPassword({ email, password });
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
                 showNotification("Login bem-sucedido!", "success");
+                // Chama handleUserSession diretamente — não depende do evento SIGNED_IN
+                if (data?.session) await handleUserSession(data.session);
             } catch (error) {
                 const msgs = {
                     'Invalid login credentials': 'Email ou senha inválidos.',
