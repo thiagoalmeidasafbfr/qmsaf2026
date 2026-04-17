@@ -2072,11 +2072,12 @@
                             const notes = String(record["Observações"] || '').trim();
 
                             // --- Horário: aceita string "HH:MM", Date (cellDates) ou fração decimal ---
+                            // SheetJS cria Date com horário LOCAL = horário do Excel — usar getHours/getMinutes
                             let gameTime;
                             const rawTime = record["Horário do Evento"];
                             if (rawTime instanceof Date && !isNaN(rawTime)) {
-                                const h = String(rawTime.getUTCHours()).padStart(2, '0');
-                                const m = String(rawTime.getUTCMinutes()).padStart(2, '0');
+                                const h = String(rawTime.getHours()).padStart(2, '0');
+                                const m = String(rawTime.getMinutes()).padStart(2, '0');
                                 gameTime = `${h}:${m}`;
                             } else if (typeof rawTime === 'number') {
                                 // fração decimal (0.7917 = 19:00)
@@ -2087,12 +2088,13 @@
                             }
 
                             // --- Data: aceita Date (cellDates), número serial ou string DD/MM/AAAA / AAAA-MM-DD ---
+                            // SheetJS cria Date com data LOCAL = data do Excel — usar getFullYear/getMonth/getDate
                             let eventDate;
                             const rawDate = record["Data do Evento"];
                             if (rawDate instanceof Date && !isNaN(rawDate)) {
-                                const y = rawDate.getUTCFullYear();
-                                const m = String(rawDate.getUTCMonth() + 1).padStart(2, '0');
-                                const d = String(rawDate.getUTCDate()).padStart(2, '0');
+                                const y = rawDate.getFullYear();
+                                const m = String(rawDate.getMonth() + 1).padStart(2, '0');
+                                const d = String(rawDate.getDate()).padStart(2, '0');
                                 eventDate = `${y}-${m}-${d}`;
                             } else if (typeof rawDate === 'number') {
                                 const dateObj = XLSX.SSF.parse_date_code(rawDate);
