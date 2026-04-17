@@ -3200,9 +3200,10 @@
                     if (error) throw error;
                     showNotification(`Perfil de usuário ${isCreating ? 'criado' : 'atualizado'} com sucesso!`, "success");
                     currentView = 'adminManageUsers';
-                    renderApp();
+                    await loadAllData();
                 } catch (error) {
-                    showNotification(`Erro ao ${isCreating ? 'criar' : 'atualizar'} perfil.`, "error");
+                    const msg = error?.message || error?.details || JSON.stringify(error);
+                    showNotification(`Erro ao ${isCreating ? 'criar' : 'atualizar'} perfil: ${msg}`, "error", 8000);
                     console.error(`Erro ao salvar perfil de usuário ${uid}:`, error);
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalButtonText;
