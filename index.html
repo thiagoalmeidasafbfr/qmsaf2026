@@ -592,7 +592,8 @@
                             await handleLogout();
                             return;
                         }
-                        loadAllData();
+                        await loadAllData(); // aguarda dados antes de renderizar
+                        return;             // renderApp() já chamado dentro de loadAllData
                     } else {
                         showNotification("Perfil do usuário não encontrado. Contacte o administrador.", "error");
                         await handleLogout();
@@ -612,7 +613,7 @@
                 currentView = 'login';
                 clearAllDataAndUnsubscribe();
             }
-            renderApp();
+            renderApp(); // só chega aqui no caso de logout
         });
 
         // Função para lidar com o login de email/senha
@@ -729,16 +730,20 @@
             unsubscribers.push(() => supabase.removeChannel(channel));
         }
 
-        // Carrega todos os dados iniciais
-        function loadAllData() {
+        // Carrega todos os dados iniciais e re-renderiza ao terminar
+        async function loadAllData() {
             clearAllDataAndUnsubscribe();
             if (!userProfile) return;
-            fetchTableData('categories', 'categories');
-            fetchTableData('sectors', 'sectors');
-            fetchTableData('employees', 'employees');
-            fetchTableData('rules', 'rules');
-            fetchTableData('records', 'records');
-            if (userProfile.isAdmin) fetchTableData('users_profile', 'allUsers');
+            const fetches = [
+                fetchTableData('categories', 'categories'),
+                fetchTableData('sectors', 'sectors'),
+                fetchTableData('employees', 'employees'),
+                fetchTableData('rules', 'rules'),
+                fetchTableData('records', 'records'),
+            ];
+            if (userProfile.isAdmin) fetches.push(fetchTableData('users_profile', 'allUsers'));
+            await Promise.all(fetches);
+            renderApp();
         }
 
         // Limpa dados globais e cancela todos os canais Supabase
