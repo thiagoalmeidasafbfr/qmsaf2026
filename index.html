@@ -318,7 +318,12 @@
 
         const SUPABASE_URL = 'https://vgcyrzhpsuoydissygfk.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnY3lyemhwc3VveWRpc3N5Z2ZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NDU3OTgsImV4cCI6MjA5MjAyMTc5OH0.dJE8XAp8DtpzI97jjGA7jeVLAgD7abcC20uzbSbHHRg';
-        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // auth.lock: desativa o Web Locks API do Supabase Auth.
+        // Evita o travamento de 5 s causado por lock órfão de aba anterior.
+        // Seguro para SPA de aba única sem fluxos de refresh concorrentes.
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: { lock: async (_n, _t, fn) => fn() }
+        });
 
         // Categorias fixas de jogo
         const GAME_CATEGORIES = [
@@ -730,20 +735,28 @@
             unsubscribers.push(() => supabase.removeChannel(channel));
         }
 
+        let _loadingData = false;
+
         // Carrega todos os dados iniciais e re-renderiza ao terminar
         async function loadAllData() {
-            clearAllDataAndUnsubscribe();
-            if (!userProfile) return;
-            const fetches = [
-                fetchTableData('categories', 'categories'),
-                fetchTableData('sectors', 'sectors'),
-                fetchTableData('employees', 'employees'),
-                fetchTableData('rules', 'rules'),
-                fetchTableData('records', 'records'),
-            ];
-            if (userProfile.isAdmin) fetches.push(fetchTableData('users_profile', 'allUsers'));
-            await Promise.all(fetches);
-            renderApp();
+            if (_loadingData) return;          // evita chamadas concorrentes
+            _loadingData = true;
+            try {
+                clearAllDataAndUnsubscribe();
+                if (!userProfile) return;
+                const fetches = [
+                    fetchTableData('categories', 'categories'),
+                    fetchTableData('sectors', 'sectors'),
+                    fetchTableData('employees', 'employees'),
+                    fetchTableData('rules', 'rules'),
+                    fetchTableData('records', 'records'),
+                ];
+                if (userProfile.isAdmin) fetches.push(fetchTableData('users_profile', 'allUsers'));
+                await Promise.all(fetches);
+                renderApp();
+            } finally {
+                _loadingData = false;
+            }
         }
 
         // Limpa dados globais e cancela todos os canais Supabase
