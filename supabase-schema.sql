@@ -271,3 +271,8 @@ DROP POLICY IF EXISTS "Somente admins inserem registros arquivados" ON public.ar
 CREATE POLICY "Somente admins inserem registros arquivados"
   ON public.archived_records FOR INSERT TO authenticated
   WITH CHECK (is_admin());
+
+DROP POLICY IF EXISTS "Somente admins excluem registros arquivados" ON public.archived_records;
+CREATE POLICY "Somente admins excluem registros arquivados"
+  ON public.archived_records FOR DELETE TO authenticated
+  USING (is_admin());
