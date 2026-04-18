@@ -132,72 +132,89 @@ ALTER TABLE public.records       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.users_profile ENABLE ROW LEVEL SECURITY;
 
 -- ---- sectors ----
+DROP POLICY IF EXISTS "Autenticados leem setores" ON public.sectors;
 CREATE POLICY "Autenticados leem setores"
   ON public.sectors FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Admins escrevem setores" ON public.sectors;
 CREATE POLICY "Admins escrevem setores"
   ON public.sectors FOR ALL TO authenticated
   USING (is_admin()) WITH CHECK (is_admin());
 
 -- ---- categories ----
+DROP POLICY IF EXISTS "Autenticados leem categorias" ON public.categories;
 CREATE POLICY "Autenticados leem categorias"
   ON public.categories FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Admins escrevem categorias" ON public.categories;
 CREATE POLICY "Admins escrevem categorias"
   ON public.categories FOR ALL TO authenticated
   USING (is_admin()) WITH CHECK (is_admin());
 
 -- ---- employees ----
+DROP POLICY IF EXISTS "Autenticados leem funcionários" ON public.employees;
 CREATE POLICY "Autenticados leem funcionários"
   ON public.employees FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Admins escrevem funcionários" ON public.employees;
 CREATE POLICY "Admins escrevem funcionários"
   ON public.employees FOR ALL TO authenticated
   USING (is_admin()) WITH CHECK (is_admin());
 
 -- ---- rules ----
+DROP POLICY IF EXISTS "Autenticados leem regras" ON public.rules;
 CREATE POLICY "Autenticados leem regras"
   ON public.rules FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Admins escrevem regras" ON public.rules;
 CREATE POLICY "Admins escrevem regras"
   ON public.rules FOR ALL TO authenticated
   USING (is_admin()) WITH CHECK (is_admin());
 
 -- ---- records ----
+DROP POLICY IF EXISTS "Admins leem todos os registros" ON public.records;
 CREATE POLICY "Admins leem todos os registros"
   ON public.records FOR SELECT TO authenticated
   USING (is_admin());
 
+DROP POLICY IF EXISTS "Gestores leem seus registros" ON public.records;
 CREATE POLICY "Gestores leem seus registros"
   ON public.records FOR SELECT TO authenticated
   USING (manager_id = auth.uid());
 
+DROP POLICY IF EXISTS "Gestores e admins inserem registros" ON public.records;
 CREATE POLICY "Gestores e admins inserem registros"
   ON public.records FOR INSERT TO authenticated
   WITH CHECK (manager_id = auth.uid() OR is_admin());
 
+DROP POLICY IF EXISTS "Admins excluem qualquer registro" ON public.records;
 CREATE POLICY "Admins excluem qualquer registro"
   ON public.records FOR DELETE TO authenticated
   USING (is_admin());
 
+DROP POLICY IF EXISTS "Gestores excluem seus registros" ON public.records;
 CREATE POLICY "Gestores excluem seus registros"
   ON public.records FOR DELETE TO authenticated
   USING (manager_id = auth.uid());
 
 -- ---- users_profile ----
+DROP POLICY IF EXISTS "Admins leem todos os perfis" ON public.users_profile;
 CREATE POLICY "Admins leem todos os perfis"
   ON public.users_profile FOR SELECT TO authenticated
   USING (is_admin());
 
+DROP POLICY IF EXISTS "Usuário lê seu próprio perfil" ON public.users_profile;
 CREATE POLICY "Usuário lê seu próprio perfil"
   ON public.users_profile FOR SELECT TO authenticated
   USING (id = auth.uid());
 
+DROP POLICY IF EXISTS "Admins escrevem todos os perfis" ON public.users_profile;
 CREATE POLICY "Admins escrevem todos os perfis"
   ON public.users_profile FOR ALL TO authenticated
   USING (is_admin()) WITH CHECK (is_admin());
 
 -- Permite criar o primeiro perfil admin quando nenhum admin existe ainda
+DROP POLICY IF EXISTS "Setup inicial: inserir próprio perfil sem admin" ON public.users_profile;
 CREATE POLICY "Setup inicial: inserir próprio perfil sem admin"
   ON public.users_profile FOR INSERT TO authenticated
   WITH CHECK (id = auth.uid() AND NOT check_admin_exists());
@@ -245,10 +262,12 @@ CREATE INDEX IF NOT EXISTS idx_archived_records_archived_at ON public.archived_r
 
 ALTER TABLE public.archived_records ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Somente admins leem registros arquivados" ON public.archived_records;
 CREATE POLICY "Somente admins leem registros arquivados"
   ON public.archived_records FOR SELECT TO authenticated
   USING (is_admin());
 
+DROP POLICY IF EXISTS "Somente admins inserem registros arquivados" ON public.archived_records;
 CREATE POLICY "Somente admins inserem registros arquivados"
   ON public.archived_records FOR INSERT TO authenticated
   WITH CHECK (is_admin());
