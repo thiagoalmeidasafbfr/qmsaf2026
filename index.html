@@ -1204,6 +1204,7 @@
                     ); break;
                 case 'adminManageUsers': renderAdminManageUsersPage(); break;
                 case 'adminCreateUserProfile': renderAdminCreateUserProfilePage(); break;
+                case 'historicoGeral': renderHistoricoGeral(); break;
                 default: renderLoginPage();
             }
         }
@@ -2773,7 +2774,7 @@
 
                     <div>
                         <p class="section-label">Ações Rápidas</p>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
                             <button id="admin-btn-new-record" class="action-card">
                                 <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="var(--apple-blue)" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg></div>
                                 <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Novo Registro</p>
@@ -2789,6 +2790,27 @@
                                 <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Histórico Completo</p>
                                 <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Todos os setores</p>
                             </button>
+                            <button id="admin-btn-historico-geral" class="action-card">
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="var(--apple-2nd)" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"/></svg></div>
+                                <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Histórico Geral</p>
+                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Registros arquivados</p>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="section-label">Arquivamento de Dados</p>
+                        <div class="exec-card p-5" style="border-left:4px solid #f59e0b">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                <div>
+                                    <p style="font-size:14px;font-weight:700;color:#92400e">Guardar Dados</p>
+                                    <p style="font-size:12px;color:#78716c;margin-top:3px">Move todos os registros ativos para o Histórico Geral e limpa o quadro atual. Esta ação não pode ser desfeita.</p>
+                                </div>
+                                <button id="admin-btn-guardar-dados" style="flex-shrink:0;padding:10px 20px;background:#f59e0b;color:#fff;font-size:13px;font-weight:700;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;transition:background .2s" onmouseover="this.style.background='#d97706'" onmouseout="this.style.background='#f59e0b'">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"/></svg>
+                                    Guardar Dados
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -2822,11 +2844,232 @@
             document.getElementById('admin-btn-new-record').onclick = () => { currentView = 'newRecord'; renderApp(); };
             document.getElementById('admin-btn-import-records').onclick = () => { currentView = 'importRecords'; renderApp(); };
             document.getElementById('admin-btn-history').onclick = () => { currentView = 'history'; renderApp(); };
+            document.getElementById('admin-btn-historico-geral').onclick = () => { currentView = 'historicoGeral'; renderApp(); };
             document.getElementById('admin-manage-categories').onclick = () => { currentView = 'adminManageCategories'; renderApp(); };
             document.getElementById('admin-manage-sectors').onclick = () => { currentView = 'adminManageSectors'; renderApp(); };
             document.getElementById('admin-manage-employees').onclick = () => { currentView = 'adminManageEmployees'; renderApp(); };
             document.getElementById('admin-manage-rules').onclick = () => { currentView = 'adminManageRules'; renderApp(); };
             document.getElementById('admin-manage-users').onclick = () => { currentView = 'adminManageUsers'; renderApp(); };
+            document.getElementById('admin-btn-guardar-dados').onclick = () => {
+                const count = globalData.records.length;
+                if (count === 0) { showNotification('Não há registros ativos para arquivar.', 'info'); return; }
+                confirmAction(
+                    'Guardar Dados',
+                    `Isso irá mover <strong>${count} registro(s)</strong> do histórico ativo para o Histórico Geral. O quadro ficará vazio após a operação. Esta ação não pode ser desfeita. Deseja continuar?`,
+                    archiveAllRecords
+                );
+            };
+        }
+
+        // Arquiva todos os registros ativos na tabela archived_records e limpa records
+        async function archiveAllRecords() {
+            try {
+                showNotification('Arquivando registros...', 'info', 5000);
+
+                const { data: allRecords, error: fetchError } = await supabase
+                    .from('records').select('*');
+                if (fetchError) throw fetchError;
+
+                if (!allRecords || allRecords.length === 0) {
+                    showNotification('Não há registros para arquivar.', 'info'); return;
+                }
+
+                const batchId = crypto.randomUUID();
+                const archivedAt = new Date().toISOString();
+
+                const toInsert = allRecords.map(r => ({
+                    original_id: r.id,
+                    archive_batch_id: batchId,
+                    archived_at: archivedAt,
+                    archived_by: currentUser.id,
+                    event_name: r.event_name,
+                    event_date: r.event_date,
+                    game_time: r.game_time,
+                    event_type: r.event_type,
+                    game_category: r.game_category,
+                    qm_classification: r.qm_classification,
+                    qm_value: r.qm_value,
+                    employee_id: r.employee_id,
+                    employee_name: r.employee_name,
+                    notes: r.notes,
+                    sector: r.sector,
+                    manager_id: r.manager_id,
+                    manager_name: r.manager_name,
+                    created_at: r.created_at,
+                }));
+
+                const batchSize = 100;
+                for (let i = 0; i < toInsert.length; i += batchSize) {
+                    const { error: insertError } = await supabase
+                        .from('archived_records').insert(toInsert.slice(i, i + batchSize));
+                    if (insertError) throw insertError;
+                }
+
+                const ids = allRecords.map(r => r.id);
+                for (let i = 0; i < ids.length; i += batchSize) {
+                    const { error: deleteError } = await supabase
+                        .from('records').delete().in('id', ids.slice(i, i + batchSize));
+                    if (deleteError) throw deleteError;
+                }
+
+                showNotification(`${allRecords.length} registro(s) arquivados com sucesso!`, 'success');
+                await loadAllData();
+            } catch (err) {
+                const msg = err?.message || JSON.stringify(err);
+                showNotification(`Erro ao arquivar: ${msg}`, 'error', 8000);
+                console.error('[archiveAllRecords]', err);
+            }
+        }
+
+        // Renderiza o Histórico Geral (somente admin) com registros arquivados
+        async function renderHistoricoGeral() {
+            if (!userProfile?.isAdmin) { currentView = 'adminDashboard'; renderApp(); return; }
+
+            appContent.innerHTML = `
+                <div class="animate-fadeIn space-y-5">
+                    <div class="exec-card p-5">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <p style="font-size:11px;font-weight:600;color:var(--apple-2nd);letter-spacing:.04em;text-transform:uppercase">Arquivamento</p>
+                                <h2 style="font-size:20px;font-weight:700;color:var(--apple-text);margin-top:2px">Histórico Geral</h2>
+                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:2px">Registros arquivados de todos os setores</p>
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <button id="btn-hg-export-xlsx" class="btn-primary" style="font-size:12px;padding:7px 12px" disabled>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>XLSX
+                                </button>
+                                <button id="btn-hg-back" class="btn-secondary" style="font-size:12px;padding:7px 12px">← Voltar</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="hg-content" class="exec-card p-10 text-center">
+                        <div style="display:flex;justify-content:center"><div class="loader"></div></div>
+                        <p style="font-size:13px;color:#64748b;margin-top:12px">Carregando histórico arquivado...</p>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('btn-hg-back').onclick = () => { currentView = 'adminDashboard'; renderApp(); };
+
+            try {
+                const { data: rawArchived, error } = await supabase
+                    .from('archived_records').select('*').order('archived_at', { ascending: false });
+                if (error) throw error;
+
+                const archived = (rawArchived || []).map(fromDB);
+
+                const batchMap = {};
+                archived.forEach(r => {
+                    const bid = r.archiveBatchId;
+                    if (!batchMap[bid]) batchMap[bid] = { id: bid, archivedAt: r.archivedAt, archivedBy: r.archivedBy, records: [] };
+                    batchMap[bid].records.push(r);
+                });
+                const batchList = Object.values(batchMap).sort((a, b) => new Date(b.archivedAt) - new Date(a.archivedAt));
+
+                let currentArchivedData = [...archived];
+
+                const getArchivedByName = (uid) => globalData.allUsers?.find(u => u.id === uid)?.name || 'Admin';
+
+                const qmBadge = (cls) => {
+                    const map = { A: 'badge-qm badge-qm-a', B: 'badge-qm badge-qm-b', C: 'badge-qm badge-qm-c', D: 'badge-qm badge-qm-d' };
+                    return `<span class="${map[cls] || 'badge-qm badge-qm-d'}">${cls || '-'}</span>`;
+                };
+
+                const generateTable = (data) => {
+                    if (data.length === 0) return `<div class="text-center py-14"><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5" class="mx-auto mb-3"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><p style="font-size:14px;color:#64748b;font-weight:500">Nenhum registro arquivado</p></div>`;
+                    const rows = data.map(r => `
+                        <tr class="tbl-row">
+                            <td class="text-xs text-slate-500 whitespace-nowrap" style="padding:10px 16px">${r.createdAt?.toDate?.().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})||'N/A'}</td>
+                            <td style="padding:10px 16px">
+                                <p class="text-xs font-semibold text-slate-800">${r.eventName||'N/A'}</p>
+                                <p class="text-xs text-slate-500">${r.eventDate?new Date(r.eventDate+'T00:00:00').toLocaleDateString('pt-BR'):'N/A'}${r.gameTime?' · '+r.gameTime:''}</p>
+                            </td>
+                            <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px;max-width:140px;overflow:hidden;text-overflow:ellipsis">${r.gameCategory||'N/A'}</td>
+                            <td class="whitespace-nowrap text-center" style="padding:10px 16px">${qmBadge(r.qmClassification)}</td>
+                            <td class="text-xs text-slate-700 font-medium whitespace-nowrap" style="padding:10px 16px">${r.employeeName||'N/A'}</td>
+                            <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${r.sector||'-'}</td>
+                            <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${r.managerName||'-'}</td>
+                            <td class="text-xs text-slate-500" style="padding:10px 16px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.notes||''}">${r.notes||'—'}</td>
+                        </tr>`).join('');
+                    return `<div class="tbl-scroll-wrap border border-slate-100 rounded-xl">
+                        <table class="tbl min-w-full">
+                            <thead><tr>
+                                <th>Criado em</th><th>Evento</th><th>Categoria</th>
+                                <th class="text-center">QM</th><th>Funcionário</th>
+                                <th>Setor</th><th>Gestor</th><th>Obs.</th>
+                            </tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table></div>`;
+                };
+
+                const renderContent = (batchId) => {
+                    const data = batchId ? (batchMap[batchId]?.records || []) : archived;
+                    const batchInfo = batchId && batchMap[batchId]
+                        ? `<div style="margin-bottom:16px;padding:12px 16px;background:#fef9c3;border:1px solid #fde68a;border-radius:10px">
+                               <p style="font-size:12px;font-weight:600;color:#92400e">Lote arquivado em ${new Date(batchMap[batchId].archivedAt).toLocaleString('pt-BR')} por ${getArchivedByName(batchMap[batchId].archivedBy)} — ${data.length} registro(s)</p>
+                           </div>` : '';
+                    document.getElementById('hg-table-container').innerHTML = batchInfo + generateTable(data);
+                    currentArchivedData = data;
+                };
+
+                const batchOptions = batchList.map(b =>
+                    `<option value="${b.id}">Lote de ${new Date(b.archivedAt).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'})} — ${b.records.length} registro(s) — por ${getArchivedByName(b.archivedBy)}</option>`
+                ).join('');
+
+                document.getElementById('hg-content').innerHTML = `
+                    <div class="p-5 space-y-5">
+                        <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                            <div class="flex-1">
+                                <label style="font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Filtrar por Lote</label>
+                                <select id="hg-batch-select" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;color:#334155;background:#fff;outline:none">
+                                    <option value="">Todos os lotes (${archived.length} registros)</option>
+                                    ${batchOptions}
+                                </select>
+                            </div>
+                            <div style="text-align:right;min-width:90px">
+                                <p style="font-size:28px;font-weight:700;color:#0f172a;line-height:1">${archived.length}</p>
+                                <p style="font-size:11px;color:#94a3b8;margin-top:2px">registros arquivados</p>
+                            </div>
+                        </div>
+                        <div id="hg-table-container">${generateTable(archived)}</div>
+                    </div>
+                `;
+
+                document.getElementById('hg-batch-select').onchange = (e) => renderContent(e.target.value);
+
+                const exportBtn = document.getElementById('btn-hg-export-xlsx');
+                exportBtn.disabled = false;
+                exportBtn.onclick = () => {
+                    if (!currentArchivedData || currentArchivedData.length === 0) { showNotification('Nenhum dado para exportar.', 'info'); return; }
+                    const sheet = currentArchivedData.map(r => ({
+                        "Data Arquivamento": new Date(r.archivedAt).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}),
+                        "Data Criação": r.createdAt?.toDate?.().toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})||'N/A',
+                        "Evento": r.eventName||'N/A',
+                        "Data Evento": r.eventDate?new Date(r.eventDate+'T00:00:00').toLocaleDateString('pt-BR'):'N/A',
+                        "Horário": r.gameTime||'-',
+                        "Cat. Jogo": r.gameCategory||'N/A',
+                        "QM": r.qmClassification||'-',
+                        "Chapa": globalData.employees.find(e=>e.id===r.employeeId)?.registration||'-',
+                        "Funcionário": r.employeeName||'N/A',
+                        "Setor": r.sector||'N/A',
+                        "Gestor Lançador": r.managerName||'N/A',
+                        "Observações": r.notes||'-'
+                    }));
+                    const ws = XLSX.utils.json_to_sheet(sheet);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, 'Histórico Geral');
+                    XLSX.writeFile(wb, 'historico_geral.xlsx');
+                    showNotification('XLSX exportado com sucesso!', 'success');
+                };
+
+            } catch (err) {
+                const msg = err?.message || JSON.stringify(err);
+                document.getElementById('hg-content').innerHTML = `
+                    <div class="p-8 text-center">
+                        <p style="color:#ef4444;font-size:14px;font-weight:600">Erro ao carregar histórico arquivado</p>
+                        <p style="color:#94a3b8;font-size:12px;margin-top:4px">${msg}</p>
+                    </div>`;
+            }
         }
 
         // Renderiza a página genérica de gerenciamento (Categorias, Setores, Funcionários)

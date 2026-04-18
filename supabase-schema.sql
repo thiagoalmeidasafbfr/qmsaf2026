@@ -212,3 +212,43 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.employees;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.rules;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.records;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.users_profile;
+
+-- ============================================================
+-- 6. Tabela de registros arquivados (somente admin)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.archived_records (
+  id                uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  original_id       uuid,                    -- ID original em public.records
+  archive_batch_id  uuid        NOT NULL,    -- agrupa registros do mesmo "Guardar Dados"
+  archived_at       timestamptz NOT NULL DEFAULT now(),
+  archived_by       uuid        REFERENCES auth.users(id),
+  -- campos espelhados de records:
+  event_name        text        NOT NULL,
+  event_date        text        NOT NULL,
+  game_time         text        NOT NULL,
+  event_type        text        NOT NULL DEFAULT 'jogo',
+  game_category     text,
+  qm_classification text,
+  qm_value          integer,
+  employee_id       text,
+  employee_name     text,
+  notes             text,
+  sector            text,
+  manager_id        uuid        REFERENCES auth.users(id),
+  manager_name      text,
+  created_at        timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_archived_records_batch       ON public.archived_records(archive_batch_id);
+CREATE INDEX IF NOT EXISTS idx_archived_records_archived_at ON public.archived_records(archived_at DESC);
+
+ALTER TABLE public.archived_records ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Somente admins leem registros arquivados"
+  ON public.archived_records FOR SELECT TO authenticated
+  USING (is_admin());
+
+CREATE POLICY "Somente admins inserem registros arquivados"
+  ON public.archived_records FOR INSERT TO authenticated
+  WITH CHECK (is_admin());
