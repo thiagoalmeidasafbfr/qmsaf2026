@@ -3004,8 +3004,10 @@
                         'Excluir registro arquivado',
                         `Deseja excluir permanentemente o registro "<strong>${eventName}</strong>" do arquivamento?`,
                         async () => {
-                            const { error } = await supabase.from('archived_records').delete().eq('id', id);
+                            const { data: deleted, error } = await supabase
+                                .from('archived_records').delete().eq('id', id).select('id');
                             if (error) { showNotification(`Erro ao excluir: ${error.message}`, 'error', 6000); return; }
+                            if (!deleted || deleted.length === 0) { showNotification('Sem permissão para excluir este registro.', 'error', 6000); return; }
                             // Remove from local arrays
                             const idx = archived.findIndex(r => r.id === id);
                             if (idx !== -1) archived.splice(idx, 1);
