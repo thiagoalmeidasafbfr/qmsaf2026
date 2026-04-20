@@ -243,7 +243,7 @@ Ao salvar um registro, o sistema calcula automaticamente a **classificação QM*
 
 ### Tabela de classificação
 
-| Tipo QM | Condição | Resultado | Valor |
+| Tipo QM | Condição | Valor |
 |---|---|---|
 | A | Fim de semana (sáb/dom) **ou** horário ≥ 21:00 | R$ 400 |
 | B | Fim de semana (sáb/dom) **ou** horário ≥ 21:00 | R$ 200 |
