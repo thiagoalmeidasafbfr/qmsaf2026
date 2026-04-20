@@ -628,9 +628,14 @@
         // Inicialização: lê sessão existente. Recovery é tratado exclusivamente pelo onAuthStateChange.
         async function initializeAuth() {
             try {
+                // Se a URL contém um token de recovery, NÃO chamar getSession() —
+                // onAuthStateChange disparará PASSWORD_RECOVERY e cuidará de tudo.
+                const hashParams = new URLSearchParams(window.location.hash.replace(/^#+/, ''));
+                if (hashParams.get('type') === 'recovery') return;
+
                 const { data: { session } } = await supabase.auth.getSession();
 
-                // Se onAuthStateChange já detectou PASSWORD_RECOVERY, não interferir
+                // Se onAuthStateChange já detectou PASSWORD_RECOVERY enquanto aguardávamos, não interferir
                 if (_isPasswordRecovery) return;
 
                 hideElement(initialLoadingDiv);
