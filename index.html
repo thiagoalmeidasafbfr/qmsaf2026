@@ -626,9 +626,25 @@
             }
         }
 
-        // Inicialização: lê sessão do storage diretamente, sem depender de eventos
+        // Inicialização: lê sessão do storage, detectando recovery antes de tudo
         async function initializeAuth() {
             try {
+                // Detecta link de recuperação de senha na URL (PKCE: ?type=recovery, implicit: #type=recovery)
+                const urlSearch = new URLSearchParams(window.location.search);
+                const urlHash = new URLSearchParams(window.location.hash.replace(/^#+/, ''));
+                const isRecovery = urlSearch.get('type') === 'recovery' || urlHash.get('type') === 'recovery';
+
+                if (isRecovery) {
+                    // Completa a troca do código/token para que updateUser() funcione depois
+                    await supabase.auth.getSession();
+                    // Remove token/code da barra de endereço
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    hideElement(initialLoadingDiv);
+                    currentView = 'resetPassword';
+                    renderApp();
+                    return;
+                }
+
                 const { data: { session } } = await supabase.auth.getSession();
                 hideElement(initialLoadingDiv);
                 if (session?.user) {
@@ -658,12 +674,15 @@
                 hideElement(initialLoadingDiv);
                 renderApp();
             } else if (event === 'PASSWORD_RECOVERY') {
-                // Usuário chegou pelo link de recuperação de senha
-                hideElement(initialLoadingDiv);
-                hideElement(appHeader);
-                hideElement(appFooter);
-                currentView = 'resetPassword';
-                renderApp();
+                // Backup: caso o evento chegue antes de initializeAuth detectar a URL
+                if (currentView !== 'resetPassword') {
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    hideElement(initialLoadingDiv);
+                    hideElement(appHeader);
+                    hideElement(appFooter);
+                    currentView = 'resetPassword';
+                    renderApp();
+                }
             }
         });
 
@@ -1222,6 +1241,8 @@
         // Renderiza a página de redefinição de senha (via link de e-mail)
         function renderResetPasswordPage() {
             const inp = `w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all`;
+            hideElement(appHeader);
+            hideElement(appFooter);
             appContent.innerHTML = `
                 <div class="flex items-center justify-center min-h-screen p-4 animate-fadeIn">
                     <div class="w-full max-w-[380px]">
@@ -1231,18 +1252,18 @@
                                     <img src="favicon.png" alt="Logo" class="h-9 w-9 object-contain">
                                 </div>
                                 <h2 class="text-xl font-bold text-slate-900 text-center">Redefinir Senha</h2>
-                                <p class="text-slate-500 mt-1 text-sm text-center">Digite sua nova senha abaixo</p>
+                                <p class="text-slate-500 mt-1 text-sm text-center">Digite sua nova senha abaixo.</p>
                             </div>
                             <form id="reset-password-form" class="space-y-4">
                                 <div>
                                     <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Nova Senha</label>
-                                    <input id="reset-new-password" type="password" required minlength="6" class="${inp}" placeholder="Mínimo 6 caracteres">
+                                    <input id="reset-new-password" type="password" required minlength="6" class="${inp}" placeholder="Mínimo 6 caracteres" autofocus>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Confirmar Nova Senha</label>
                                     <input id="reset-confirm-password" type="password" required minlength="6" class="${inp}" placeholder="Repita a nova senha">
                                 </div>
-                                <button type="submit" class="btn-primary w-full mt-2">Salvar Nova Senha</button>
+                                <button type="submit" id="reset-submit-btn" class="btn-primary w-full mt-2">Salvar Nova Senha</button>
                             </form>
                         </div>
                     </div>
@@ -1250,22 +1271,22 @@
             `;
             document.getElementById('reset-password-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const newPassword = document.getElementById('reset-new-password').value;
-                const confirmPassword = document.getElementById('reset-confirm-password').value;
+                const newPassword = document.getElementById('reset-new-password').value.trim();
+                const confirmPassword = document.getElementById('reset-confirm-password').value.trim();
                 if (newPassword !== confirmPassword) { showNotification('As senhas não conferem.', 'error'); return; }
                 if (newPassword.length < 6) { showNotification('A senha deve ter pelo menos 6 caracteres.', 'error'); return; }
-                const btn = e.target.querySelector('button[type="submit"]');
+                const btn = document.getElementById('reset-submit-btn');
                 btn.disabled = true;
-                btn.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Salvando...</span>`;
+                btn.innerHTML = `<span class="flex items-center justify-center gap-2"><span class="loader_small_blue"></span>Salvando...</span>`;
                 try {
                     const { error } = await supabase.auth.updateUser({ password: newPassword });
                     if (error) throw error;
-                    showNotification('Senha redefinida com sucesso! Faça login.', 'success', 5000);
                     await supabase.auth.signOut();
+                    showNotification('Senha redefinida com sucesso! Faça login com a nova senha.', 'success', 5000);
                     currentView = 'login';
                     renderApp();
                 } catch (err) {
-                    showNotification(`Erro: ${err.message}`, 'error', 6000);
+                    showNotification(`Erro ao redefinir senha: ${err.message}`, 'error', 6000);
                     btn.disabled = false;
                     btn.innerHTML = 'Salvar Nova Senha';
                 }
