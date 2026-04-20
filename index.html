@@ -323,7 +323,6 @@
         // Seguro para SPA de aba única sem fluxos de refresh concorrentes.
         const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             auth: {
-                flowType: 'pkce',
                 detectSessionInUrl: true,
                 lock: async (_n, _t, fn) => fn()
             }
@@ -626,26 +625,14 @@
             }
         }
 
-        // Inicialização: lê sessão do storage, detectando recovery antes de tudo
+        // Inicialização: lê sessão existente. Recovery é tratado exclusivamente pelo onAuthStateChange.
         async function initializeAuth() {
             try {
-                // Detecta link de recuperação de senha na URL (PKCE: ?type=recovery, implicit: #type=recovery)
-                const urlSearch = new URLSearchParams(window.location.search);
-                const urlHash = new URLSearchParams(window.location.hash.replace(/^#+/, ''));
-                const isRecovery = urlSearch.get('type') === 'recovery' || urlHash.get('type') === 'recovery';
-
-                if (isRecovery) {
-                    // Completa a troca do código/token para que updateUser() funcione depois
-                    await supabase.auth.getSession();
-                    // Remove token/code da barra de endereço
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                    hideElement(initialLoadingDiv);
-                    currentView = 'resetPassword';
-                    renderApp();
-                    return;
-                }
-
                 const { data: { session } } = await supabase.auth.getSession();
+
+                // Se onAuthStateChange já detectou PASSWORD_RECOVERY, não interferir
+                if (_isPasswordRecovery) return;
+
                 hideElement(initialLoadingDiv);
                 if (session?.user) {
                     await handleUserSession(session);
@@ -654,6 +641,7 @@
                     renderApp();
                 }
             } catch (err) {
+                if (_isPasswordRecovery) return;
                 console.error('[initializeAuth]', err);
                 hideElement(initialLoadingDiv);
                 currentView = 'login';
@@ -661,12 +649,16 @@
             }
         }
 
+        // Flag: indica que o evento PASSWORD_RECOVERY foi disparado pelo Supabase
+        let _isPasswordRecovery = false;
+
         // Listener de autenticação
         supabase.auth.onAuthStateChange(async (event, _session) => {
             if (event === 'SIGNED_OUT') {
                 currentUser = null;
                 userProfile = null;
                 _handlingSession = false;
+                _isPasswordRecovery = false;
                 hideElement(appHeader);
                 hideElement(appFooter);
                 currentView = 'login';
@@ -674,15 +666,13 @@
                 hideElement(initialLoadingDiv);
                 renderApp();
             } else if (event === 'PASSWORD_RECOVERY') {
-                // Backup: caso o evento chegue antes de initializeAuth detectar a URL
-                if (currentView !== 'resetPassword') {
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                    hideElement(initialLoadingDiv);
-                    hideElement(appHeader);
-                    hideElement(appFooter);
-                    currentView = 'resetPassword';
-                    renderApp();
-                }
+                _isPasswordRecovery = true;
+                window.history.replaceState({}, document.title, window.location.pathname);
+                hideElement(initialLoadingDiv);
+                hideElement(appHeader);
+                hideElement(appFooter);
+                currentView = 'resetPassword';
+                renderApp();
             }
         });
 
