@@ -641,8 +641,7 @@
             }
         }
 
-        // Listener de autenticação — só reage a SIGNED_OUT
-        // SIGNED_IN é tratado diretamente pelo handleLogin para evitar dupla execução
+        // Listener de autenticação
         supabase.auth.onAuthStateChange(async (event, _session) => {
             if (event === 'SIGNED_OUT') {
                 currentUser = null;
@@ -654,8 +653,14 @@
                 clearAllDataAndUnsubscribe();
                 hideElement(initialLoadingDiv);
                 renderApp();
+            } else if (event === 'PASSWORD_RECOVERY') {
+                // Usuário chegou pelo link de recuperação de senha
+                hideElement(initialLoadingDiv);
+                hideElement(appHeader);
+                hideElement(appFooter);
+                currentView = 'resetPassword';
+                renderApp();
             }
-            // INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED, PASSWORD_RECOVERY — ignorados
         });
 
         // Segurança: se após 15 s a tela de loading ainda estiver visível, força login
@@ -1205,8 +1210,62 @@
                 case 'adminManageUsers': renderAdminManageUsersPage(); break;
                 case 'adminCreateUserProfile': renderAdminCreateUserProfilePage(); break;
                 case 'historicoGeral': renderHistoricoGeral(); break;
+                case 'resetPassword': renderResetPasswordPage(); break;
                 default: renderLoginPage();
             }
+        }
+
+        // Renderiza a página de redefinição de senha (via link de e-mail)
+        function renderResetPasswordPage() {
+            const inp = `w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all`;
+            appContent.innerHTML = `
+                <div class="flex items-center justify-center min-h-screen p-4 animate-fadeIn">
+                    <div class="w-full max-w-[380px]">
+                        <div class="exec-card p-8">
+                            <div class="flex flex-col items-center mb-7">
+                                <div class="w-14 h-14 rounded-2xl bg-slate-900 flex items-center justify-center mb-4 shadow-lg">
+                                    <img src="favicon.png" alt="Logo" class="h-9 w-9 object-contain">
+                                </div>
+                                <h2 class="text-xl font-bold text-slate-900 text-center">Redefinir Senha</h2>
+                                <p class="text-slate-500 mt-1 text-sm text-center">Digite sua nova senha abaixo</p>
+                            </div>
+                            <form id="reset-password-form" class="space-y-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Nova Senha</label>
+                                    <input id="reset-new-password" type="password" required minlength="6" class="${inp}" placeholder="Mínimo 6 caracteres">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Confirmar Nova Senha</label>
+                                    <input id="reset-confirm-password" type="password" required minlength="6" class="${inp}" placeholder="Repita a nova senha">
+                                </div>
+                                <button type="submit" class="btn-primary w-full mt-2">Salvar Nova Senha</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('reset-password-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const newPassword = document.getElementById('reset-new-password').value;
+                const confirmPassword = document.getElementById('reset-confirm-password').value;
+                if (newPassword !== confirmPassword) { showNotification('As senhas não conferem.', 'error'); return; }
+                if (newPassword.length < 6) { showNotification('A senha deve ter pelo menos 6 caracteres.', 'error'); return; }
+                const btn = e.target.querySelector('button[type="submit"]');
+                btn.disabled = true;
+                btn.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Salvando...</span>`;
+                try {
+                    const { error } = await supabase.auth.updateUser({ password: newPassword });
+                    if (error) throw error;
+                    showNotification('Senha redefinida com sucesso! Faça login.', 'success', 5000);
+                    await supabase.auth.signOut();
+                    currentView = 'login';
+                    renderApp();
+                } catch (err) {
+                    showNotification(`Erro: ${err.message}`, 'error', 6000);
+                    btn.disabled = false;
+                    btn.innerHTML = 'Salvar Nova Senha';
+                }
+            });
         }
 
         // Renderiza a página de login
@@ -1299,7 +1358,7 @@
 
                 try {
                     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                        redirectTo: window.location.href
+                        redirectTo: window.location.origin + window.location.pathname
                     });
                     if (error) throw error;
                     showNotification("Link de redefinição enviado para seu e-mail!", "success");
