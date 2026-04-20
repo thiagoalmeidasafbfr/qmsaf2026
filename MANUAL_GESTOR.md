@@ -244,21 +244,21 @@ Ao salvar um registro, o sistema calcula automaticamente a **classificação QM*
 ### Tabela de classificação
 
 | Tipo QM | Condição | Resultado | Valor |
-|---|---|---|---|
-| A | Fim de semana (sáb/dom) **ou** horário ≥ 21:00 | **A** | R$ 400 |
-| B | Fim de semana (sáb/dom) **ou** horário ≥ 21:00 | **B** | R$ 200 |
-| A | Dia útil (seg–sex) **e** horário < 21:00 | **C** | R$ 200 |
-| B | Dia útil (seg–sex) **e** horário < 21:00 | **D** | R$ 100 |
+|---|---|---|
+| A | Fim de semana (sáb/dom) **ou** horário ≥ 21:00 | R$ 400 |
+| B | Fim de semana (sáb/dom) **ou** horário ≥ 21:00 | R$ 200 |
+| A | Dia útil (seg–sex) **e** horário < 21:00 | R$ 200 |
+| B | Dia útil (seg–sex) **e** horário < 21:00 | R$ 100 |
 
 ### Exemplos práticos
 
 | Situação | Tipo QM | Resultado |
 |---|---|---|
-| Sexta-feira, 19:00 | A | C — R$ 200 |
-| Sexta-feira, 21:00 | A | A — R$ 400 |
-| Sábado, 16:00 | B | B — R$ 200 |
-| Quarta-feira, 20:59 | B | D — R$ 100 |
-| Domingo, qualquer horário | A | A — R$ 400 |
+| Sexta-feira, 19:00 | A | R$ 200 |
+| Sexta-feira, 21:00 | A | R$ 400 |
+| Sábado, 16:00 | B | R$ 200 |
+| Quarta-feira, 20:59 | B | R$ 100 |
+| Domingo, qualquer horário | A | R$ 400 |
 
 > O horário **21:00 em ponto** já conta como noturno (≥ 21:00 = classificação mais alta).
 
