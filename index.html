@@ -318,6 +318,11 @@
 
         const SUPABASE_URL = 'https://vgcyrzhpsuoydissygfk.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnY3lyemhwc3VveWRpc3N5Z2ZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NDU3OTgsImV4cCI6MjA5MjAyMTc5OH0.dJE8XAp8DtpzI97jjGA7jeVLAgD7abcC20uzbSbHHRg';
+
+        // Lido sincronamente antes do createClient() — garante que o hash ainda existe
+        const _RECOVERY_FROM_URL = new URLSearchParams(
+            window.location.hash.replace(/^#+/, '')
+        ).get('type') === 'recovery';
         // auth.lock: desativa o Web Locks API do Supabase Auth.
         // Evita o travamento de 5 s causado por lock órfão de aba anterior.
         // Seguro para SPA de aba única sem fluxos de refresh concorrentes.
@@ -627,19 +632,12 @@
 
         // Inicialização: lê sessão existente. Recovery é tratado pelo onAuthStateChange.
         async function initializeAuth() {
+            // Se a URL de entrada era um link de recovery, não fazer login automático.
+            // onAuthStateChange disparará PASSWORD_RECOVERY e mostrará o formulário.
+            if (_RECOVERY_FROM_URL) return;
+
             try {
-                // Lê o hash ANTES de getSession() (Supabase pode limpá-lo durante a chamada)
-                const hashBefore = new URLSearchParams(window.location.hash.replace(/^#+/, ''));
-                const isRecoveryUrl = hashBefore.get('type') === 'recovery';
-
-                // Chama getSession() sempre — necessário para que a sessão de recovery fique
-                // ativa e updateUser() funcione depois
                 const { data: { session } } = await supabase.auth.getSession();
-
-                // Se onAuthStateChange disparou PASSWORD_RECOVERY (durante ou após getSession),
-                // ou se a URL era de recovery, não fazer login automático
-                if (_isPasswordRecovery || isRecoveryUrl) return;
-
                 hideElement(initialLoadingDiv);
                 if (session?.user) {
                     await handleUserSession(session);
@@ -648,7 +646,6 @@
                     renderApp();
                 }
             } catch (err) {
-                if (_isPasswordRecovery) return;
                 console.error('[initializeAuth]', err);
                 hideElement(initialLoadingDiv);
                 currentView = 'login';
@@ -656,16 +653,12 @@
             }
         }
 
-        // Flag: indica que o evento PASSWORD_RECOVERY foi disparado pelo Supabase
-        let _isPasswordRecovery = false;
-
         // Listener de autenticação
         supabase.auth.onAuthStateChange(async (event, _session) => {
             if (event === 'SIGNED_OUT') {
                 currentUser = null;
                 userProfile = null;
                 _handlingSession = false;
-                _isPasswordRecovery = false;
                 hideElement(appHeader);
                 hideElement(appFooter);
                 currentView = 'login';
@@ -673,7 +666,10 @@
                 hideElement(initialLoadingDiv);
                 renderApp();
             } else if (event === 'PASSWORD_RECOVERY') {
-                _isPasswordRecovery = true;
+                // Para tudo — mostra formulário de nova senha
+                currentUser = null;
+                userProfile = null;
+                _handlingSession = false;
                 window.history.replaceState({}, document.title, window.location.pathname);
                 hideElement(initialLoadingDiv);
                 hideElement(appHeader);
@@ -686,9 +682,12 @@
         // Segurança: se após 15 s a tela de loading ainda estiver visível, força login
         setTimeout(() => {
             if (!initialLoadingDiv.classList.contains('hidden')) {
-                console.error('[init] Timeout de 15 s — forçando tela de login');
                 _handlingSession = false;
                 hideElement(initialLoadingDiv);
+                if (_RECOVERY_FROM_URL) {
+                    // Token expirado ou inválido
+                    showNotification('Link de recuperação inválido ou expirado. Solicite um novo.', 'error', 7000);
+                }
                 currentView = 'login';
                 renderApp();
             }
