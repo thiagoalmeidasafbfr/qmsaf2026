@@ -1132,8 +1132,7 @@
         // --- RENDERIZAÇÃO DAS VIEWS ---
         // Função principal para renderizar a view atual
         function renderApp() {
-            if (!currentUser && currentView !== 'login' && currentView !== 'firstAccess' && currentView !== 'setup') {
-                // Se não há usuário logado e não está nas telas de login/primeiro acesso/setup, redireciona para login
+            if (!currentUser && currentView !== 'login' && currentView !== 'firstAccess' && currentView !== 'setup' && currentView !== 'resetPassword') {
                 currentView = 'login';
             }
 
