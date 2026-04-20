@@ -1561,20 +1561,16 @@
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                                 </div>
                                 <h2 class="text-xl font-bold text-slate-900 text-center">Redefinir Senha</h2>
-                                <p class="text-slate-500 mt-1.5 text-sm text-center">Confirme sua senha atual e defina uma nova.</p>
+                                <p class="text-slate-500 mt-1.5 text-sm text-center">Defina uma nova senha para sua conta.</p>
                             </div>
                             <form id="change-password-form" class="space-y-4">
                                 <div>
-                                    <label for="currentPassword" class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Senha Atual</label>
-                                    <input id="currentPassword" type="password" required class="${inp}" placeholder="••••••••">
-                                </div>
-                                <div>
                                     <label for="newPassword" class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Nova Senha</label>
-                                    <input id="newPassword" type="password" required class="${inp}" placeholder="••••••••">
+                                    <input id="newPassword" type="password" required class="${inp}" placeholder="Mínimo 6 caracteres" autofocus>
                                 </div>
                                 <div>
                                     <label for="confirmNewPassword" class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Confirmar Nova Senha</label>
-                                    <input id="confirmNewPassword" type="password" required class="${inp}" placeholder="••••••••">
+                                    <input id="confirmNewPassword" type="password" required class="${inp}" placeholder="Repita a nova senha">
                                 </div>
                                 <button type="submit" class="w-full flex items-center justify-center gap-2 text-sm bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors shadow-sm mt-1">
                                     Salvar Nova Senha
@@ -1597,12 +1593,11 @@
 
         async function handleChangePassword(e) {
             e.preventDefault();
-            const currentPassword = document.getElementById('currentPassword').value;
             const newPassword = document.getElementById('newPassword').value;
             const confirmNewPassword = document.getElementById('confirmNewPassword').value;
 
             if (newPassword !== confirmNewPassword) {
-                showNotification('As novas senhas não conferem.', 'error');
+                showNotification('As senhas não conferem.', 'error');
                 return;
             }
             if (newPassword.length < 6) {
@@ -1616,14 +1611,6 @@
             submitButton.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Processando...</span>`;
 
             try {
-                // Verifica senha atual fazendo login novamente
-                const { error: authError } = await supabase.auth.signInWithPassword({
-                    email: currentUser.email,
-                    password: currentPassword
-                });
-                if (authError) throw new Error('auth/wrong-password');
-
-                // Atualiza para a nova senha
                 const { error } = await supabase.auth.updateUser({ password: newPassword });
                 if (error) throw error;
 
@@ -1631,10 +1618,7 @@
                 currentView = userProfile.isAdmin ? 'adminDashboard' : 'managerDashboard';
                 renderApp();
             } catch (error) {
-                showNotification(
-                    error.message === 'auth/wrong-password' ? 'Senha atual incorreta.' : `Erro: ${error.message}`,
-                    'error'
-                );
+                showNotification(`Erro ao atualizar senha: ${error.message}`, 'error');
             } finally {
                 submitButton.disabled = false;
                 submitButton.innerHTML = originalContent;
