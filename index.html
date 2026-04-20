@@ -322,7 +322,11 @@
         // Evita o travamento de 5 s causado por lock órfão de aba anterior.
         // Seguro para SPA de aba única sem fluxos de refresh concorrentes.
         const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-            auth: { lock: async (_n, _t, fn) => fn() }
+            auth: {
+                flowType: 'pkce',
+                detectSessionInUrl: true,
+                lock: async (_n, _t, fn) => fn()
+            }
         });
 
         // Categorias fixas de jogo
@@ -1357,8 +1361,9 @@
                 submitButton.innerHTML = `<span class="flex items-center justify-center"><span class="loader_small_blue mr-2"></span>Enviando...</span>`;
 
                 try {
+                    const appUrl = (window.location.origin + window.location.pathname).replace(/\/+$/, '') + '/';
                     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                        redirectTo: window.location.origin + window.location.pathname
+                        redirectTo: appUrl
                     });
                     if (error) throw error;
                     showNotification("Link de redefinição enviado para seu e-mail!", "success");
