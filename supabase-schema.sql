@@ -37,6 +37,24 @@ GRANT EXECUTE ON FUNCTION public.check_admin_exists TO anon;
 GRANT EXECUTE ON FUNCTION public.check_admin_exists TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_admin TO authenticated;
 
+-- Exclui um usuário do auth.users (cascateia para users_profile).
+-- Só admins podem chamar. SECURITY DEFINER permite acesso ao schema auth.
+CREATE OR REPLACE FUNCTION public.delete_auth_user(user_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT public.is_admin() THEN
+    RAISE EXCEPTION 'Acesso negado: apenas administradores podem excluir usuários';
+  END IF;
+  DELETE FROM auth.users WHERE id = user_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.delete_auth_user TO authenticated;
+
 -- ============================================================
 -- 2. Tabelas
 -- ============================================================

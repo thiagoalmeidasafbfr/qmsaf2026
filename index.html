@@ -1097,15 +1097,16 @@
             );
         }
 
-        // Exclui o perfil de um usuário (conta auth permanece; removê-la requer o painel Supabase)
+        // Exclui o usuário do auth.users via RPC (cascateia para users_profile).
+        // Isso libera o e-mail para novo cadastro.
         async function deleteUserCompletely(uid) {
             if (!userProfile?.isAdmin) { showNotification("Acesso negado.", "error"); return; }
             confirmAction(
                 'Excluir Usuário',
-                'Tem certeza que deseja excluir este usuário? O perfil será removido. A conta de autenticação deve ser excluída no painel do Supabase.',
+                'Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.',
                 async () => {
                     try {
-                        const { error } = await supabase.from('users_profile').delete().eq('id', uid);
+                        const { error } = await supabase.rpc('delete_auth_user', { user_id: uid });
                         if (error) throw error;
                         showNotification('Usuário excluído com sucesso!', 'success');
                     } catch (err) {
