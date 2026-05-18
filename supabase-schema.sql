@@ -241,12 +241,21 @@ CREATE POLICY "Setup inicial: inserir próprio perfil sem admin"
 -- 5. Habilitar real-time para todas as tabelas
 -- ============================================================
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.sectors;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.categories;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.employees;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.rules;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.records;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.users_profile;
+DO $$
+DECLARE
+  tbl text;
+BEGIN
+  FOREACH tbl IN ARRAY ARRAY['sectors','categories','employees','rules','records','users_profile']
+  LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND tablename = tbl
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', tbl);
+    END IF;
+  END LOOP;
+END;
+$$;
 
 -- ============================================================
 -- 6. Tabela de registros arquivados (somente admin)
