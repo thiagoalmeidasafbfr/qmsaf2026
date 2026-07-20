@@ -75,14 +75,19 @@ CREATE TABLE IF NOT EXISTS public.categories (
 );
 
 CREATE TABLE IF NOT EXISTS public.employees (
-  id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  name         text        NOT NULL,
-  registration text,
-  sector       text        DEFAULT '',     -- campo legado (single sector)
-  sectors      text[]      DEFAULT '{}',   -- múltiplos departamentos
-  created_at   timestamptz DEFAULT now(),
-  created_by   uuid        REFERENCES auth.users(id)
+  id               uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name             text        NOT NULL,
+  registration     text,
+  sector           text        DEFAULT '',     -- campo legado (single sector)
+  sectors          text[]      DEFAULT '{}',   -- múltiplos departamentos
+  can_use_grade_a  boolean     DEFAULT false,  -- habilita seleção de Grau A; senão só Grau B
+  created_at       timestamptz DEFAULT now(),
+  created_by       uuid        REFERENCES auth.users(id)
 );
+
+-- Migração idempotente para bancos já existentes
+ALTER TABLE public.employees
+  ADD COLUMN IF NOT EXISTS can_use_grade_a boolean DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS public.rules (
   id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -290,9 +295,16 @@ CREATE INDEX IF NOT EXISTS idx_archived_records_archived_at ON public.archived_r
 ALTER TABLE public.archived_records ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Somente admins leem registros arquivados" ON public.archived_records;
-CREATE POLICY "Somente admins leem registros arquivados"
+CREATE POLICY "Admins leem registros arquivados"
   ON public.archived_records FOR SELECT TO authenticated
   USING (is_admin());
+
+-- Gestores podem consultar os registros arquivados que eles próprios lançaram
+-- (registros das suas equipes). Continuam sem permissão de inserir/excluir.
+DROP POLICY IF EXISTS "Gestores leem seus registros arquivados" ON public.archived_records;
+CREATE POLICY "Gestores leem seus registros arquivados"
+  ON public.archived_records FOR SELECT TO authenticated
+  USING (manager_id = auth.uid());
 
 DROP POLICY IF EXISTS "Somente admins inserem registros arquivados" ON public.archived_records;
 CREATE POLICY "Somente admins inserem registros arquivados"

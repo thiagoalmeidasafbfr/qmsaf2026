@@ -1197,6 +1197,7 @@
                             { name: 'name', label: 'Nome do Funcionário', type: 'text' },
                             { name: 'registration', label: 'Matrícula (Chapa)', type: 'text' },
                             { name: 'sectors', label: 'Departamentos', type: 'multiselect-sectors', options: globalData.sectors.map(s => ({ value: s.name, label: s.name })) },
+                            { name: 'canUseGradeA', label: 'Pode utilizar Grau A', type: 'checkbox', hint: 'Se desmarcado, apenas o Grau B poderá ser lançado para este funcionário.' },
                         ],
                         (data) => addItemToFirestore('employees', data),
                         (id, data) => updateItemInFirestore('employees', id, data),
@@ -1651,7 +1652,7 @@
                     </div>
                     <div>
                         <p class="section-label">Ações</p>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <button id="btn-new-record" class="action-card">
                                 <div class="action-icon" style="background:#eff6ff"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#2563eb" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg></div>
                                 <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Novo Registro</p>
@@ -1667,6 +1668,11 @@
                                 <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Histórico</p>
                                 <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Ver todos os registros</p>
                             </button>
+                            <button id="btn-historico-geral" class="action-card">
+                                <div class="action-icon" style="background:#fffbeb"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#d97706" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"/></svg></div>
+                                <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Arquivamento</p>
+                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Registros arquivados</p>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1674,6 +1680,7 @@
             document.getElementById('btn-new-record').addEventListener('click', () => { currentView = 'newRecord'; renderApp(); });
             document.getElementById('btn-import-records').addEventListener('click', () => { currentView = 'importRecords'; renderApp(); });
             document.getElementById('btn-history').addEventListener('click', () => { currentView = 'history'; renderApp(); });
+            document.getElementById('btn-historico-geral').addEventListener('click', () => { currentView = 'historicoGeral'; renderApp(); });
         }
 
         // Renderiza o formulário para inclusão de novo registro
@@ -1757,6 +1764,7 @@
                                         <option value="A">A</option>
                                         <option value="B">B</option>
                                     </select>
+                                    <p id="qmType-hint" class="text-xs text-slate-400 mt-1 hidden">Funcionário habilitado apenas para o Grau B.</p>
                                 </div>
                                 <div>
                                     <label for="employee" class="${lbl}">Funcionário</label>
@@ -1795,6 +1803,32 @@
                     document.getElementById('label-notes').textContent = isOutros ? 'Observações (obrigatório):' : 'Observações (obrigatório se selecionar "Outros"):';
                 });
             });
+
+            // Controle do Grau A: só habilita seleção A/B se o funcionário permitir; senão trava em B.
+            const updateGradeAvailability = () => {
+                const empSel = document.getElementById('employee');
+                const qmSel = document.getElementById('qmType');
+                const hint = document.getElementById('qmType-hint');
+                if (!empSel || !qmSel) return;
+                const empId = empSel.value;
+                const emp = (empId && empId !== 'OUTROS') ? globalData.employees.find(e => e.id === empId) : null;
+                const canA = !!(emp && emp.canUseGradeA);
+                if (canA) {
+                    const prev = qmSel.value;
+                    qmSel.innerHTML = '<option value="">Selecione</option><option value="A">A</option><option value="B">B</option>';
+                    qmSel.value = (prev === 'A' || prev === 'B') ? prev : '';
+                    qmSel.disabled = false;
+                    if (hint) hint.classList.add('hidden');
+                } else {
+                    qmSel.innerHTML = '<option value="B">B</option>';
+                    qmSel.value = 'B';
+                    qmSel.disabled = true;
+                    // Só exibe o aviso depois que um funcionário sem permissão for selecionado
+                    if (hint) hint.classList.toggle('hidden', !(empId && empId !== 'OUTROS'));
+                }
+            };
+            document.getElementById('employee').addEventListener('change', updateGradeAvailability);
+            updateGradeAvailability();
 
             document.getElementById('new-record-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
@@ -1929,13 +1963,13 @@
             }
 
             // Colunas unificadas para Jogo e Outros
+            // (Tipo QM removido: a importação sempre registra Grau B)
             const headers = [
                 "Tipo de Evento",
                 "Nome do Evento",
                 "Data do Evento",
                 "Horário do Evento",
                 "Categoria do Jogo",
-                "Tipo QM",
                 "Funcionário",
                 "Observações"
             ];
@@ -1955,16 +1989,14 @@
 
             // Aba Listas (referência para dropdowns)
             const eventTypes = ['Jogo', 'Outros'];
-            const qmTypes = ['A', 'B'];
-            const maxRows = Math.max(employeesForLists.length, GAME_TIMES.length, GAME_CATEGORIES.length, qmTypes.length, eventTypes.length);
-            const listsData = [["Tipos de Evento", "Funcionários", "Horários", "Categorias do Jogo (só para Jogo)", "Tipo QM"]];
+            const maxRows = Math.max(employeesForLists.length, GAME_TIMES.length, GAME_CATEGORIES.length, eventTypes.length);
+            const listsData = [["Tipos de Evento", "Funcionários", "Horários", "Categorias do Jogo (só para Jogo)"]];
             for (let i = 0; i < maxRows; i++) {
                 listsData.push([
                     eventTypes[i] || '',
                     employeesForLists[i] || '',
                     GAME_TIMES[i] || '',
-                    GAME_CATEGORIES[i] || '',
-                    qmTypes[i] || ''
+                    GAME_CATEGORIES[i] || ''
                 ]);
             }
             const wsLists = XLSX.utils.aoa_to_sheet(listsData);
@@ -1985,7 +2017,6 @@
                 ["Data do Evento", "Data de realização", "Sim", "DD/MM/AAAA  ou  AAAA-MM-DD"],
                 ["Horário do Evento", "Horário de início em intervalos de 15 min", "Sim", "Ex: 18:00 / 20:30 / 21:00  (ver aba Listas)"],
                 ["Categoria do Jogo", "Categoria — somente quando Tipo = Jogo", "Se Jogo: Sim. Se Outros: deixar em branco", "Ver aba Listas"],
-                ["Tipo QM", "Classificação do funcionário: A ou B", "Sim", "A  ou  B  (ver aba Listas)"],
                 ["Funcionário", "Nome do funcionário conforme cadastro no sistema", "Sim", "Ver aba Listas  (ou 'Outros' para externos)"],
                 ["Observações", "Campo de observações adicionais", "Obrigatório se Tipo = Outros", "Texto livre"],
                 [""],
@@ -1997,7 +2028,8 @@
                 ["4. O Horário deve estar em intervalos exatos de 15 minutos (ex: 00:00, 00:15, 00:30...)."],
                 ["5. Use exatamente o nome do funcionário conforme listado na aba Listas."],
                 ["   Para funcionários externos, coloque 'Outros' no Funcionário e informe o nome nas Observações."],
-                ["6. Arquivos aceitos: .xlsx, .xls, .csv"]
+                ["6. Todos os registros importados são classificados como Grau B. O Grau A só está disponível no lançamento manual, para funcionários habilitados."],
+                ["7. Arquivos aceitos: .xlsx, .xls, .csv"]
             ];
             const wsTutorial = XLSX.utils.aoa_to_sheet(tutorialData);
             XLSX.utils.book_append_sheet(workbook, wsTutorial, "Tutorial");
@@ -2027,9 +2059,10 @@
                         </div>
                         <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-5 text-xs text-blue-800 leading-relaxed space-y-2">
                             <p class="font-semibold">Planilha unificada — Jogos e Outros Eventos</p>
-                            <p>Colunas: <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Tipo de Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Nome do Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Data do Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Horário do Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Categoria do Jogo</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Tipo QM</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Funcionário</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Observações</code></p>
+                            <p>Colunas: <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Tipo de Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Nome do Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Data do Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Horário do Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Categoria do Jogo</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Funcionário</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Observações</code></p>
                             <p>• <strong>Tipo de Evento = "Jogo":</strong> preencha a Categoria do Jogo; Observações é opcional.</p>
                             <p>• <strong>Tipo de Evento = "Outros":</strong> deixe Categoria em branco; Observações é <strong>obrigatório</strong>.</p>
+                            <p>• Todos os registros importados são classificados como <strong>Grau B</strong>. O Grau A está disponível apenas no lançamento manual.</p>
                             <p>Baixe o modelo para ver a aba <strong>Tutorial</strong> com instruções completas e a aba <strong>Listas</strong> com os valores válidos.</p>
                         </div>
                         <div class="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center">
@@ -2083,8 +2116,9 @@
                     const headerNormMap = { 'Horário do Jogo': 'Horário do Evento' };
                     const headers = rawHeaders.map(h => headerNormMap[h] || h);
 
-                    // Cabeçalhos obrigatórios mínimos (Tipo de Evento é opcional para backward compat)
-                    const requiredHeaders = ["Nome do Evento", "Data do Evento", "Horário do Evento", "Tipo QM", "Funcionário"];
+                    // Cabeçalhos obrigatórios mínimos (Tipo de Evento é opcional para backward compat).
+                    // "Tipo QM" não é mais usado: a importação sempre registra Grau B.
+                    const requiredHeaders = ["Nome do Evento", "Data do Evento", "Horário do Evento", "Funcionário"];
                     // Aceita também o cabeçalho legado "Horário do Jogo" (já normalizado acima)
                     const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
 
@@ -2214,11 +2248,9 @@
                                 finalEmployeeName = foundEmployee.name;
                             }
 
-                            const qmTypeRaw = (record["Tipo QM"] || '').trim().toUpperCase();
-                            if (qmTypeRaw !== 'A' && qmTypeRaw !== 'B') {
-                                throw new Error(`Tipo QM "${qmTypeRaw || '(vazio)'}" inválido. Use apenas "A" ou "B".`);
-                            }
-                            const qmType = qmTypeRaw; // 'A' ou 'B'
+                            // A opção de Grau A não fica disponível na importação:
+                            // todos os registros importados são sempre Grau B.
+                            const qmType = 'B';
                             const qmResult = computeQMClassification(qmType, eventDate, gameTime);
 
                             const dataToSave = {
@@ -2978,9 +3010,13 @@
             }
         }
 
-        // Renderiza o Arquivamento (somente admin) com registros arquivados
+        // Renderiza o Arquivamento com registros arquivados.
+        // Admins veem todos os setores; gestores veem apenas os registros das suas equipes
+        // (aplicado via RLS). Somente admins podem excluir registros arquivados.
         async function renderHistoricoGeral() {
-            if (!userProfile?.isAdmin) { currentView = 'adminDashboard'; renderApp(); return; }
+            if (!userProfile?.isAdmin && !userProfile?.isManager) { currentView = 'login'; renderApp(); return; }
+            const canDelete = !!userProfile?.isAdmin;
+            const backView = userProfile?.isAdmin ? 'adminDashboard' : 'managerDashboard';
 
             appContent.innerHTML = `
                 <div class="animate-fadeIn space-y-5">
@@ -2989,7 +3025,7 @@
                             <div>
                                 <p style="font-size:11px;font-weight:600;color:var(--apple-2nd);letter-spacing:.04em;text-transform:uppercase">Arquivamento</p>
                                 <h2 style="font-size:20px;font-weight:700;color:var(--apple-text);margin-top:2px">Arquivamento</h2>
-                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:2px">Registros arquivados de todos os setores</p>
+                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:2px">${canDelete ? 'Registros arquivados de todos os setores' : 'Registros arquivados das suas equipes'}</p>
                             </div>
                             <div class="flex items-center gap-2 flex-wrap">
                                 <button id="btn-hg-export-xlsx" class="btn-primary" style="font-size:12px;padding:7px 12px" disabled>
@@ -3006,7 +3042,7 @@
                 </div>
             `;
 
-            document.getElementById('btn-hg-back').onclick = () => { currentView = 'adminDashboard'; renderApp(); };
+            document.getElementById('btn-hg-back').onclick = () => { currentView = backView; renderApp(); };
 
             try {
                 const { data: rawArchived, error } = await supabase
@@ -3047,18 +3083,18 @@
                             <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${r.sector||'-'}</td>
                             <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${r.managerName||'-'}</td>
                             <td class="text-xs text-slate-500" style="padding:10px 16px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.notes||''}">${r.notes||'—'}</td>
-                            <td class="text-center" style="padding:10px 16px">
+                            ${canDelete ? `<td class="text-center" style="padding:10px 16px">
                                 <button class="btn-delete-archived text-slate-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors" data-id="${r.id}" title="Excluir registro arquivado">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                 </button>
-                            </td>
+                            </td>` : ''}
                         </tr>`).join('');
                     return `<div class="tbl-scroll-wrap border border-slate-100 rounded-xl">
                         <table class="tbl min-w-full">
                             <thead><tr>
                                 <th>Criado em</th><th>Evento</th><th>Categoria</th>
                                 <th class="text-center">QM</th><th>Funcionário</th>
-                                <th>Setor</th><th>Gestor</th><th>Obs.</th><th class="text-center">Ação</th>
+                                <th>Setor</th><th>Gestor</th><th>Obs.</th>${canDelete ? '<th class="text-center">Ação</th>' : ''}
                             </tr></thead>
                             <tbody>${rows}</tbody>
                         </table></div>`;
@@ -3228,6 +3264,10 @@
                         if (field.type === 'multiselect-sectors') {
                             const secs = getEmployeeSectors(item);
                             cellVal = secs.length > 0 ? secs.join(', ') : '—';
+                        } else if (field.type === 'checkbox') {
+                            cellVal = item[field.name]
+                                ? '<span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;font-weight:700;background:#dcfce7;color:#166534">Sim</span>'
+                                : '<span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:11px;font-weight:700;background:#f1f5f9;color:#64748b">Não</span>';
                         } else if (field.type === 'date' && item[field.name]) {
                             cellVal = new Date(item[field.name] + 'T00:00:00').toLocaleDateString('pt-BR');
                         } else {
@@ -3330,6 +3370,15 @@
                     } else if (field.type === 'select') {
                         const optionsHtml = field.options.map(opt => `<option value="${opt.value}" ${value === opt.value ? 'selected' : ''}>${opt.label}</option>`).join('');
                         formHtml += `<div class="mb-4"><label for="${fieldId}" class="${lbl}">${field.label}</label><select id="${fieldId}" name="${field.name}" class="${inputBaseClass}"><option value="">Selecione</option>${optionsHtml}</select></div>`;
+                    } else if (field.type === 'checkbox') {
+                        const isChecked = itemToEdit ? !!itemToEdit[field.name] : false;
+                        formHtml += `<div class="mb-4">
+                            <label class="flex items-center gap-2.5 text-sm text-slate-700 cursor-pointer">
+                                <input type="checkbox" id="${fieldId}" name="${field.name}" ${isChecked ? 'checked' : ''} class="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500">
+                                <span class="font-medium">${field.label}</span>
+                            </label>
+                            ${field.hint ? `<p class="text-xs text-slate-400 mt-1">${field.hint}</p>` : ''}
+                        </div>`;
                     } else {
                         formHtml += `<div class="mb-4"><label for="${fieldId}" class="${lbl}">${field.label}</label><input type="${field.type || 'text'}" id="${fieldId}" name="${field.name}" value="${value}" class="${inputBaseClass}" required></div>`;
                     }
@@ -3351,6 +3400,9 @@
                             const selectedSectors = Array.from(checked).map(cb => cb.value);
                             formData.sectors = selectedSectors;
                             formData.sector = selectedSectors[0] || '';
+                        } else if (field.type === 'checkbox') {
+                            const inputElement = document.getElementById(`field-${field.name}`);
+                            formData[field.name] = !!(inputElement && inputElement.checked);
                         } else {
                             const inputElement = document.getElementById(`field-${field.name}`);
                             if (inputElement) {
@@ -3882,7 +3934,7 @@
                 headers = [{ "Nome": '' }];
                 sheetName = 'Setores'; fileName = 'modelo_setores.xlsx';
             } else if (collectionKey === 'employees') {
-                headers = [{ "Nome": '', "Matrícula": '', "Departamentos": '' }];
+                headers = [{ "Nome": '', "Matrícula": '', "Departamentos": '', "Pode Grau A": '' }];
                 sheetName = 'Funcionários'; fileName = 'modelo_funcionarios.xlsx';
             } else return;
             const ws = XLSX.utils.json_to_sheet(headers);
@@ -3903,7 +3955,8 @@
                 dataForSheet = items.map(e => ({
                     "Nome": e.name,
                     "Matrícula": e.registration || '',
-                    "Departamentos": getEmployeeSectors(e).join(', ')
+                    "Departamentos": getEmployeeSectors(e).join(', '),
+                    "Pode Grau A": e.canUseGradeA ? 'Sim' : 'Não'
                 }));
                 sheetName = 'Funcionários'; fileName = 'funcionarios.xlsx';
             } else return;
@@ -3965,6 +4018,11 @@
             let added = 0, updated = 0, skipped = 0, sectorsCreated = 0;
             const errors = [];
 
+            // Só grava o flag de Grau A se a coluna existir na planilha,
+            // evitando resetar o valor de funcionários já cadastrados em importações antigas.
+            const hasGradeAColumn = rows.length > 0 && Object.keys(rows[0]).some(k =>
+                ['pode grau a', 'can_use_grade_a'].includes(k.toString().trim().toLowerCase()));
+
             // Coleta todos os departamentos únicos mencionados na planilha
             const mentionedSectors = new Set();
             rows.forEach(row => {
@@ -3994,10 +4052,13 @@
                 if (!name) { errors.push(`Linha ${i + 2}: Nome vazio, ignorado.`); skipped++; continue; }
                 const sectors = deptRaw ? deptRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
                 const validSectors = sectors.filter(s => sectorNames.has(s.toLowerCase()));
+                const gradeARaw = (row['Pode Grau A'] || row['pode grau a'] || row['can_use_grade_a'] || '').toString().trim().toLowerCase();
+                const canUseGradeA = ['sim', 's', 'true', '1', 'x', 'yes'].includes(gradeARaw);
                 let existing = null;
                 if (registration) existing = existingItems.find(e => e.registration === registration);
                 if (!existing) existing = existingItems.find(e => e.name.toLowerCase() === name.toLowerCase());
                 const payload = { name, registration: registration || null, sectors: validSectors, sector: validSectors[0] || '' };
+                if (hasGradeAColumn) payload.can_use_grade_a = canUseGradeA;
                 if (existing) {
                     const { error } = await supabase.from('employees').update(payload).eq('id', existing.id);
                     if (error) { errors.push(`Linha ${i + 2} ("${name}"): ${error.message}`); skipped++; }
