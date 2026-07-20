@@ -279,6 +279,43 @@
             border-radius: 8px; background: var(--apple-bg);
             margin-bottom: 12px; flex-shrink: 0;
         }
+
+        /* ── Analytics ── */
+        .an-kpi {
+            background: var(--apple-surface);
+            border: 1px solid var(--apple-border);
+            border-radius: 12px;
+            padding: 15px 16px;
+        }
+        .an-kpi-num { font-size: 25px; font-weight: 700; color: var(--apple-text); letter-spacing: -.02em; line-height: 1.05; }
+        .an-kpi-label { font-size: 11px; color: var(--apple-3rd); margin-top: 5px; text-transform: uppercase; letter-spacing: .03em; font-weight: 600; }
+        .an-kpi-sub { font-size: 11px; color: var(--apple-2nd); margin-top: 3px; }
+        .an-card {
+            background: var(--apple-surface);
+            border: 1px solid var(--apple-border);
+            border-radius: 12px;
+            padding: 18px 18px 20px;
+        }
+        .an-card h3 { font-size: 14px; font-weight: 700; color: var(--apple-text); }
+        .an-card .an-sub { font-size: 11px; color: var(--apple-3rd); margin-top: 1px; }
+        .an-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+        .an-row:last-child { margin-bottom: 0; }
+        .an-row-label { font-size: 12px; color: var(--apple-text); width: 132px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .an-track { flex: 1; background: var(--apple-bg); border-radius: 6px; height: 22px; overflow: hidden; display: flex; }
+        .an-fill { height: 100%; display: flex; align-items: center; border-radius: 6px 0 0 6px; transition: width .4s ease; min-width: 2px; }
+        .an-row-val { font-size: 12px; font-weight: 700; color: var(--apple-text); width: 78px; text-align: right; flex-shrink: 0; }
+        .an-hm-cell {
+            text-align: center; font-size: 12px; font-weight: 600;
+            padding: 8px 4px; border-radius: 6px; color: var(--apple-text);
+        }
+        .an-legend-dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+        .an-bars { display: flex; align-items: flex-end; gap: 4px; height: 150px; }
+        .an-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 5px; min-width: 0; }
+        .an-bar { width: 100%; max-width: 34px; background: var(--apple-blue); border-radius: 4px 4px 0 0; transition: height .4s ease; min-height: 2px; }
+        .an-bar-x { font-size: 9px; color: var(--apple-3rd); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        .an-chip { display:inline-flex; align-items:center; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--apple-border); background: var(--apple-surface); color: var(--apple-2nd); }
+        .an-chip.active { background: var(--apple-blue); color: #fff; border-color: var(--apple-blue); }
+        .an-empty { text-align:center; padding: 28px 10px; color: var(--apple-3rd); font-size: 13px; }
     </style>
 </head>
 <body>
@@ -1230,6 +1267,7 @@
                 case 'adminManageUsers': renderAdminManageUsersPage(); break;
                 case 'adminCreateUserProfile': renderAdminCreateUserProfilePage(); break;
                 case 'historicoGeral': renderHistoricoGeral(); break;
+                case 'adminAnalytics': renderAnalyticsPage(); break;
                 case 'resetPassword': renderResetPasswordPage(); break;
                 default: renderLoginPage();
             }
@@ -2861,6 +2899,19 @@
                         </div>
                     </div>
 
+                    <button id="admin-btn-analytics" class="exec-card p-5 w-full text-left" style="border-left:4px solid #6366f1;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px">
+                        <div style="display:flex;align-items:center;gap:14px">
+                            <div style="width:44px;height:44px;flex-shrink:0;border-radius:11px;background:#eef2ff;display:flex;align-items:center;justify-content:center">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#4f46e5" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
+                            </div>
+                            <div>
+                                <p style="font-size:15px;font-weight:700;color:var(--apple-text)">Analytics</p>
+                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:2px">Indicadores completos: eventos, setores, profissionais e classificações de QM</p>
+                            </div>
+                        </div>
+                        <span style="flex-shrink:0;color:#6366f1;font-size:13px;font-weight:700;display:flex;align-items:center;gap:4px">Abrir <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg></span>
+                    </button>
+
                     <div>
                         <p class="section-label">Ações Rápidas</p>
                         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2930,6 +2981,7 @@
                     </div>
                 </div>
             `;
+            document.getElementById('admin-btn-analytics').onclick = () => { currentView = 'adminAnalytics'; renderApp(); };
             document.getElementById('admin-btn-new-record').onclick = () => { currentView = 'newRecord'; renderApp(); };
             document.getElementById('admin-btn-import-records').onclick = () => { currentView = 'importRecords'; renderApp(); };
             document.getElementById('admin-btn-history').onclick = () => { currentView = 'history'; renderApp(); };
@@ -3214,6 +3266,329 @@
                         <p style="color:#94a3b8;font-size:12px;margin-top:4px">${msg}</p>
                     </div>`;
             }
+        }
+
+        // ============================================================
+        // Analytics (somente admin) — painel completo de indicadores
+        // ============================================================
+        async function renderAnalyticsPage() {
+            if (!userProfile?.isAdmin) { currentView = 'login'; renderApp(); return; }
+
+            const QM_COLORS = { A: '#0071e3', B: '#34c759', C: '#ff9500', D: '#8e8e93' };
+            const QM_ORDER = ['A', 'B', 'C', 'D'];
+            const TYPE_COLORS = { jogo: '#0071e3', outros: '#ff9500' };
+            const WD_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+            const MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+            const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            const brl = (n) => 'R$ ' + Number(n || 0).toLocaleString('pt-BR');
+            const hexA = (hex, a) => { const h = hex.replace('#', ''); const n = parseInt(h, 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a.toFixed(3)})`; };
+
+            appContent.innerHTML = `
+                <div class="animate-fadeIn space-y-5">
+                    <div class="exec-card p-5">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <p style="font-size:11px;font-weight:600;color:var(--apple-2nd);letter-spacing:.04em;text-transform:uppercase">Painel Administrativo</p>
+                                <h2 style="font-size:20px;font-weight:700;color:var(--apple-text);margin-top:2px">Analytics</h2>
+                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:2px">Indicadores de eventos, setores, profissionais e classificações de QM</p>
+                            </div>
+                            <button id="an-back" class="btn-secondary" style="font-size:12px;padding:7px 12px">← Voltar</button>
+                        </div>
+                    </div>
+                    <div id="an-content" class="exec-card p-10 text-center">
+                        <div style="display:flex;justify-content:center"><div class="loader"></div></div>
+                        <p style="font-size:13px;color:#64748b;margin-top:12px">Carregando dados de análise...</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('an-back').onclick = () => { currentView = 'adminDashboard'; renderApp(); };
+
+            // Busca registros arquivados para uma análise histórica completa
+            let archived = [];
+            let archiveError = false;
+            try {
+                const { data, error } = await supabase.from('archived_records').select('*');
+                if (error) throw error;
+                archived = (data || []).map(fromDB);
+            } catch (e) {
+                archiveError = true;
+                console.error('[analytics] arquivados:', e);
+            }
+
+            const activeTagged = (globalData.records || []).map(r => ({ ...r, _src: 'ativo' }));
+            const archivedTagged = archived.map(r => ({ ...r, _src: 'arquivado' }));
+            const allData = [...activeTagged, ...archivedTagged];
+
+            const state = { period: 'all', source: 'all' };
+
+            // ---------- Componentes de gráfico (SVG/CSS puro) ----------
+            const hbarChart = (items, opts = {}) => {
+                if (!items.length) return `<div class="an-empty">Sem dados para o filtro selecionado.</div>`;
+                const max = Math.max(...items.map(i => i.value), 1);
+                return items.map(i => {
+                    const pct = i.value / max * 100;
+                    const val = opts.fmt ? opts.fmt(i.value) : i.value;
+                    return `<div class="an-row">
+                        <span class="an-row-label" title="${esc(i.label)}">${esc(i.label)}</span>
+                        <span class="an-track"><span class="an-fill" style="width:${pct}%;background:${i.color || 'var(--apple-blue)'}"></span></span>
+                        <span class="an-row-val">${val}</span>
+                    </div>`;
+                }).join('');
+            };
+
+            const stackedChart = (rows, segDefs) => {
+                if (!rows.length) return `<div class="an-empty">Sem dados para o filtro selecionado.</div>`;
+                const max = Math.max(...rows.map(r => segDefs.reduce((a, s) => a + (r[s.key] || 0), 0)), 1);
+                const legend = `<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">${segDefs.map(s => `<span style="font-size:11px;color:var(--apple-2nd)"><span class="an-legend-dot" style="background:${s.color}"></span>${esc(s.label)}</span>`).join('')}</div>`;
+                const body = rows.map(r => {
+                    const total = segDefs.reduce((a, s) => a + (r[s.key] || 0), 0);
+                    const fills = segDefs.map(s => (r[s.key] || 0) > 0
+                        ? `<span class="an-fill" style="width:${(r[s.key] / max * 100)}%;background:${s.color};border-radius:0" title="${esc(s.label)}: ${r[s.key]}"></span>` : '').join('');
+                    return `<div class="an-row"><span class="an-row-label" title="${esc(r.label)}">${esc(r.label)}</span><span class="an-track">${fills}</span><span class="an-row-val">${total}</span></div>`;
+                }).join('');
+                return legend + body;
+            };
+
+            const donutChart = (segments, centerLabel) => {
+                const total = segments.reduce((a, s) => a + s.value, 0);
+                if (!total) return `<div class="an-empty">Sem dados para o filtro selecionado.</div>`;
+                const r = 52, c = 2 * Math.PI * r; let off = 0;
+                const arcs = segments.map(s => {
+                    const frac = s.value / total;
+                    const el = `<circle cx="70" cy="70" r="${r}" fill="none" stroke="${s.color}" stroke-width="20" stroke-dasharray="${frac * c} ${c}" stroke-dashoffset="${-off * c}" transform="rotate(-90 70 70)"></circle>`;
+                    off += frac; return el;
+                }).join('');
+                return `<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+                    <svg width="140" height="140" viewBox="0 0 140 140" style="flex-shrink:0">
+                        <circle cx="70" cy="70" r="${r}" fill="none" stroke="var(--apple-bg)" stroke-width="20"></circle>
+                        ${arcs}
+                        <text x="70" y="66" text-anchor="middle" style="font-size:22px;font-weight:700;fill:var(--apple-text)">${total}</text>
+                        <text x="70" y="84" text-anchor="middle" style="font-size:10px;fill:var(--apple-3rd)">${centerLabel || 'eventos'}</text>
+                    </svg>
+                    <div style="flex:1;min-width:130px">
+                        ${segments.map(s => `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
+                            <span style="font-size:12px;color:var(--apple-text)"><span class="an-legend-dot" style="background:${s.color}"></span>${esc(s.label)}</span>
+                            <span style="font-size:12px;font-weight:700;color:var(--apple-text)">${s.value} <span style="color:var(--apple-3rd);font-weight:500">(${Math.round(s.value / total * 100)}%)</span></span>
+                        </div>`).join('')}
+                    </div>
+                </div>`;
+            };
+
+            const vbarChart = (items, opts = {}) => {
+                if (!items.length) return `<div class="an-empty">Sem dados para o filtro selecionado.</div>`;
+                const max = Math.max(...items.map(i => i.value), 1);
+                const H = 130; // altura máxima da barra em px (robusto vs. % de flex)
+                return `<div style="display:flex;align-items:flex-end;gap:4px;height:${H + 22}px">
+                    ${items.map(i => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:0" title="${esc(i.label)}: ${i.value}">
+                        <span style="font-size:10px;font-weight:700;color:var(--apple-2nd);margin-bottom:4px">${i.value || ''}</span>
+                        <div style="width:100%;max-width:34px;height:${Math.round(i.value / max * H)}px;min-height:${i.value > 0 ? 3 : 0}px;background:${opts.color || 'var(--apple-blue)'};border-radius:4px 4px 0 0"></div>
+                    </div>`).join('')}
+                </div>
+                <div style="display:flex;gap:4px;margin-top:6px">
+                    ${items.map(i => `<span class="an-bar-x" style="flex:1;text-align:center">${esc(i.short != null ? i.short : i.label)}</span>`).join('')}
+                </div>`;
+            };
+
+            const heatmap = (rowKeys, cols, getVal) => {
+                let max = 0;
+                rowKeys.forEach(rw => cols.forEach(c => { max = Math.max(max, getVal(rw, c)); }));
+                if (max === 0) return `<div class="an-empty">Sem dados para o filtro selecionado.</div>`;
+                const header = `<tr><th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--apple-2nd);font-weight:600">Setor</th>${cols.map(c => `<th style="padding:6px 8px;font-size:11px;font-weight:700;text-align:center;color:${QM_COLORS[c]}">${c}</th>`).join('')}<th style="padding:6px 8px;font-size:11px;color:var(--apple-2nd);text-align:center;font-weight:600">Total</th></tr>`;
+                const body = rowKeys.map(rw => {
+                    const rowTotal = cols.reduce((a, c) => a + getVal(rw, c), 0);
+                    return `<tr>
+                        <td style="padding:4px 8px;font-size:12px;color:var(--apple-text);white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis" title="${esc(rw)}">${esc(rw)}</td>
+                        ${cols.map(c => {
+                            const v = getVal(rw, c);
+                            const intensity = v / max;
+                            const bg = v === 0 ? 'var(--apple-bg)' : hexA(QM_COLORS[c], 0.14 + intensity * 0.76);
+                            const col = v === 0 ? 'var(--apple-3rd)' : (intensity > 0.55 ? '#fff' : 'var(--apple-text)');
+                            return `<td style="padding:3px"><div class="an-hm-cell" style="background:${bg};color:${col}">${v || '·'}</div></td>`;
+                        }).join('')}
+                        <td style="text-align:center;font-size:12px;font-weight:700;color:var(--apple-text)">${rowTotal}</td>
+                    </tr>`;
+                }).join('');
+                return `<div style="overflow-x:auto"><table style="width:100%;border-collapse:separate;border-spacing:0"><thead>${header}</thead><tbody>${body}</tbody></table></div>`;
+            };
+
+            const card = (title, sub, inner, extraStyle = '') => `
+                <div class="an-card" style="${extraStyle}">
+                    <div style="margin-bottom:14px"><h3>${title}</h3>${sub ? `<p class="an-sub">${sub}</p>` : ''}</div>
+                    ${inner}
+                </div>`;
+
+            const chipGroup = (label, key, options) => `
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span style="font-size:11px;font-weight:600;color:var(--apple-2nd);text-transform:uppercase;letter-spacing:.03em">${label}</span>
+                    ${options.map(o => `<button class="an-chip ${state[key] === o.v ? 'active' : ''}" data-key="${key}" data-val="${o.v}">${o.l}</button>`).join('')}
+                </div>`;
+
+            // ---------- Agregações + montagem ----------
+            const buildDashboard = () => {
+                const curYear = String(new Date().getFullYear());
+                const curMonth = new Date().toISOString().slice(0, 7);
+                const cut12 = new Date(); cut12.setMonth(cut12.getMonth() - 11); cut12.setDate(1);
+                const cut12Str = cut12.toISOString().slice(0, 10);
+
+                const inPeriod = (r) => {
+                    const d = r.eventDate || '';
+                    if (state.period === 'all') return true;
+                    if (!d) return false;
+                    if (state.period === 'year') return d.slice(0, 4) === curYear;
+                    if (state.period === 'month') return d.slice(0, 7) === curMonth;
+                    if (state.period === 'last12') return d >= cut12Str;
+                    return true;
+                };
+
+                const sourceSet = state.source === 'ativo' ? activeTagged
+                    : state.source === 'arquivado' ? archivedTagged : allData;
+                const data = sourceSet.filter(inPeriod);
+
+                const etOf = (r) => (r.eventType === 'outros' ? 'outros' : 'jogo');
+
+                // KPIs
+                const total = data.length;
+                const jogos = data.filter(r => etOf(r) === 'jogo').length;
+                const outros = total - jogos;
+                const totalValue = data.reduce((a, r) => a + (Number(r.qmValue) || 0), 0);
+                const avgValue = total ? Math.round(totalValue / total) : 0;
+                const distinctPros = new Set(data.filter(r => r.employeeName).map(r => r.employeeName.toLowerCase())).size;
+                const sectorsUsed = new Set(data.map(r => r.sector).filter(Boolean)).size;
+                const catsUsed = new Set(data.filter(r => etOf(r) === 'jogo' && r.gameCategory).map(r => r.gameCategory)).size;
+
+                // Contagens auxiliares
+                const countBy = (arr, keyFn) => {
+                    const m = {};
+                    arr.forEach(r => { const k = keyFn(r); if (k == null || k === '') return; m[k] = (m[k] || 0) + 1; });
+                    return m;
+                };
+                const sumBy = (arr, keyFn, valFn) => {
+                    const m = {};
+                    arr.forEach(r => { const k = keyFn(r); if (k == null || k === '') return; m[k] = (m[k] || 0) + (valFn(r) || 0); });
+                    return m;
+                };
+                const toSorted = (m, n) => Object.entries(m).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, n || Infinity);
+
+                // QM por classificação
+                const qmCounts = QM_ORDER.map(c => ({ label: c, value: data.filter(r => r.qmClassification === c).length, color: QM_COLORS[c] }));
+                const qmValueByClass = QM_ORDER.map(c => ({ c, v: data.filter(r => r.qmClassification === c).reduce((a, r) => a + (Number(r.qmValue) || 0), 0) }));
+
+                // Setores
+                const bySector = toSorted(countBy(data, r => r.sector), 12).map(i => ({ ...i, color: 'var(--apple-blue)' }));
+
+                // Setor × tipo
+                const sectorNames = Array.from(new Set(data.map(r => r.sector).filter(Boolean)));
+                const sectorType = sectorNames.map(s => ({
+                    label: s,
+                    jogo: data.filter(r => r.sector === s && etOf(r) === 'jogo').length,
+                    outros: data.filter(r => r.sector === s && etOf(r) === 'outros').length,
+                })).sort((a, b) => (b.jogo + b.outros) - (a.jogo + a.outros)).slice(0, 10);
+
+                // Profissionais
+                const proByCount = toSorted(countBy(data, r => r.employeeName || 'N/A'), 12).map(i => ({ ...i, color: '#6366f1' }));
+                const proByValue = toSorted(sumBy(data, r => r.employeeName || 'N/A', r => Number(r.qmValue) || 0), 10)
+                    .map(i => ({ ...i, color: '#0d9488' }));
+
+                // Categorias de jogo
+                const byCategory = toSorted(countBy(data.filter(r => etOf(r) === 'jogo'), r => r.gameCategory), 12).map(i => ({ ...i, color: '#7c3aed' }));
+
+                // Gestores
+                const byManager = toSorted(countBy(data, r => r.managerName), 10).map(i => ({ ...i, color: '#d97706' }));
+
+                // Heatmap setor × QM
+                const hmSectors = sectorNames
+                    .map(s => ({ s, t: data.filter(r => r.sector === s).length }))
+                    .sort((a, b) => b.t - a.t).slice(0, 12).map(x => x.s);
+                const hmVal = (s, c) => data.filter(r => r.sector === s && r.qmClassification === c).length;
+
+                // Timeline mensal (até 12 meses mais recentes com dados)
+                const monthMap = countBy(data.filter(r => r.eventDate), r => r.eventDate.slice(0, 7));
+                const monthKeys = Object.keys(monthMap).sort().slice(-12);
+                const timeline = monthKeys.map(k => {
+                    const [y, m] = k.split('-');
+                    return { label: k, short: `${MONTHS_SHORT[Number(m) - 1]}/${y.slice(2)}`, value: monthMap[k] };
+                });
+
+                // Dia da semana
+                const wdCounts = [0, 0, 0, 0, 0, 0, 0];
+                data.forEach(r => { if (r.eventDate) { const d = new Date(r.eventDate + 'T00:00:00'); if (!isNaN(d)) wdCounts[d.getDay()]++; } });
+                const weekday = WD_SHORT.map((w, i) => ({ label: w, short: w, value: wdCounts[i] }));
+
+                const busiest = timeline.length ? [...timeline].sort((a, b) => b.value - a.value)[0] : null;
+                const topSector = bySector[0];
+                const topPro = proByCount[0];
+
+                const kpi = (num, label, sub) => `<div class="an-kpi"><p class="an-kpi-num">${num}</p><p class="an-kpi-label">${label}</p>${sub ? `<p class="an-kpi-sub">${sub}</p>` : ''}</div>`;
+
+                const srcNote = state.source === 'all'
+                    ? `${activeTagged.length} ativos + ${archivedTagged.length} arquivados`
+                    : state.source === 'ativo' ? `${activeTagged.length} ativos` : `${archivedTagged.length} arquivados`;
+
+                return `
+                    <div class="space-y-5">
+                        <div class="an-card" style="padding:16px 18px">
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                ${chipGroup('Período', 'period', [{ v: 'all', l: 'Todos' }, { v: 'year', l: 'Ano atual' }, { v: 'last12', l: 'Últimos 12 meses' }, { v: 'month', l: 'Mês atual' }])}
+                                ${chipGroup('Fonte', 'source', [{ v: 'all', l: 'Ativos + Arquivados' }, { v: 'ativo', l: 'Ativos' }, { v: 'arquivado', l: 'Arquivados' }])}
+                            </div>
+                            <p style="font-size:11px;color:var(--apple-3rd);margin-top:12px">Analisando <strong style="color:var(--apple-2nd)">${total}</strong> registro(s) — fonte: ${srcNote}.${archiveError ? ' <span style="color:#d97706">Não foi possível carregar os arquivados.</span>' : ''}</p>
+                        </div>
+
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            ${kpi(total, 'Eventos', busiest ? `Pico: ${busiest.short} (${busiest.value})` : '')}
+                            ${kpi(jogos, 'Jogos', total ? `${Math.round(jogos / total * 100)}% do total` : '')}
+                            ${kpi(outros, 'Outros eventos', total ? `${Math.round(outros / total * 100)}% do total` : '')}
+                            ${kpi(brl(totalValue), 'Valor total QM', `Ticket médio ${brl(avgValue)}`)}
+                            ${kpi(distinctPros, 'Profissionais', topPro ? `Top: ${esc(topPro.label)}` : '')}
+                            ${kpi(sectorsUsed, 'Setores ativos', topSector ? `Top: ${esc(topSector.label)}` : '')}
+                            ${kpi(catsUsed, 'Categorias de jogo')}
+                            ${kpi(qmCounts.find(q => q.label === 'A')?.value || 0, 'QMs Grau A', total ? `${Math.round((qmCounts.find(q => q.label === 'A')?.value || 0) / total * 100)}% dos QMs` : '')}
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                            ${card('Eventos por tipo', 'Jogo vs. outros eventos', donutChart([
+                                { label: 'Jogo', value: jogos, color: TYPE_COLORS.jogo },
+                                { label: 'Outros', value: outros, color: TYPE_COLORS.outros },
+                            ]))}
+                            ${card('Classificação de QM', 'Distribuição por grau (A / B / C / D)', hbarChart(qmCounts) + `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--apple-sep);display:flex;gap:16px;flex-wrap:wrap">${qmValueByClass.map(x => `<span style="font-size:11px;color:var(--apple-2nd)"><span class="an-legend-dot" style="background:${QM_COLORS[x.c]}"></span>${x.c}: <strong style="color:var(--apple-text)">${brl(x.v)}</strong></span>`).join('')}</div>`)}
+                        </div>
+
+                        ${card('Eventos por mês', 'Volume de registros nos últimos meses', vbarChart(timeline, { color: 'var(--apple-blue)' }))}
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                            ${card('Eventos por setor', 'Setores com maior volume (top 12)', hbarChart(bySector))}
+                            ${card('Setores × tipo de evento', 'Quais setores mais fazem cada tipo (top 10)', stackedChart(sectorType, [{ key: 'jogo', label: 'Jogo', color: TYPE_COLORS.jogo }, { key: 'outros', label: 'Outros', color: TYPE_COLORS.outros }]))}
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                            ${card('Profissionais que mais fazem QM', 'Ranking por nº de registros (top 12)', hbarChart(proByCount))}
+                            ${card('Profissionais por valor', 'Ranking por valor acumulado de QM (top 10)', hbarChart(proByValue, { fmt: brl }))}
+                        </div>
+
+                        ${card('Mapa de calor — Setor × Classificação de QM', 'Contagem de registros por grau em cada setor (top 12 setores)', heatmap(hmSectors, QM_ORDER, hmVal))}
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                            ${card('Categorias de jogo mais frequentes', 'Somente eventos do tipo Jogo (top 12)', hbarChart(byCategory))}
+                            ${card('Lançamentos por gestor', 'Quem mais registrou QM (top 10)', hbarChart(byManager))}
+                        </div>
+
+                        ${card('Distribuição por dia da semana', 'Concentração de eventos ao longo da semana', vbarChart(weekday, { color: '#6366f1' }))}
+                    </div>
+                `;
+            };
+
+            const rerender = () => {
+                const el = document.getElementById('an-content');
+                el.className = '';
+                el.innerHTML = buildDashboard();
+                el.querySelectorAll('.an-chip').forEach(ch => ch.onclick = () => {
+                    state[ch.dataset.key] = ch.dataset.val;
+                    rerender();
+                });
+            };
+
+            rerender();
         }
 
         // Renderiza a página genérica de gerenciamento (Categorias, Setores, Funcionários)
