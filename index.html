@@ -11,59 +11,123 @@
          A configuração acima é um exemplo e deve ser adaptada cuidadosamente ao seu ambiente.
     -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
     <!-- Biblioteca SheetJS para exportação/importação de XLSX -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
-        /* ── Fundação Apple ── */
+        /* ─────────────────────────────────────────────────────────
+           Design system — monocromático executivo (identidade SAF Botafogo)
+           Paleta: puro preto/branco + escalas neutras + único acento (âmbar sóbrio)
+           ───────────────────────────────────────────────────────── */
         :root {
-            --apple-bg:      #f5f5f7;
-            --apple-surface: #ffffff;
-            --apple-border:  rgba(0, 0, 0, 0.08);
-            --apple-text:    #1d1d1f;
-            --apple-2nd:     #6e6e73;
-            --apple-3rd:     #86868b;
-            --apple-blue:    #0071e3;
-            --apple-blue-h:  #0077ed;
-            --apple-red:     #ff3b30;
-            --apple-sep:     rgba(0, 0, 0, 0.06);
+            /* Superfícies */
+            --bg:            #f4f4f2;
+            --bg-alt:        #ececea;
+            --surface:       #ffffff;
+            --surface-2:     #fafaf9;
+
+            /* Texto */
+            --ink:           #0a0a0a;
+            --ink-2:         #4a4a48;
+            --ink-3:         #82827e;
+            --ink-4:         #b5b5b0;
+
+            /* Linhas */
+            --line:          rgba(10, 10, 10, 0.09);
+            --line-strong:   rgba(10, 10, 10, 0.16);
+            --sep:           rgba(10, 10, 10, 0.05);
+
+            /* Acento único (âmbar/champanhe sóbrio) */
+            --accent:        #b7791f;
+            --accent-h:      #8f5f18;
+            --accent-soft:   rgba(183, 121, 31, 0.09);
+
+            /* Estados */
+            --danger:        #7f1d1d;
+            --danger-bg:     rgba(127, 29, 29, 0.06);
+            --success:       #14532d;
+            --success-bg:    rgba(20, 83, 45, 0.06);
+
+            /* Aliases legados (mantidos para compatibilidade dos style="" inline) */
+            --apple-bg:      var(--bg);
+            --apple-surface: var(--surface);
+            --apple-border:  var(--line);
+            --apple-text:    var(--ink);
+            --apple-2nd:     var(--ink-2);
+            --apple-3rd:     var(--ink-3);
+            --apple-blue:    var(--ink);
+            --apple-blue-h:  #2a2a2a;
+            --apple-red:     var(--danger);
+            --apple-sep:     var(--sep);
+
+            --radius-sm: 4px;
+            --radius:    10px;
+            --radius-lg: 14px;
         }
+        html, body { background: var(--bg); }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+            font-feature-settings: 'cv11', 'ss01', 'ss03', 'tnum';
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
-            background-color: var(--apple-bg);
-            color: var(--apple-text);
-            font-size: 15px;
+            color: var(--ink);
+            font-size: 14px;
+            letter-spacing: -0.005em;
         }
         .font_inter { font-family: inherit; }
 
+        /* Textura sutil no fundo — evita a sensação "plana genérica" */
+        body::before {
+            content: "";
+            position: fixed; inset: 0; pointer-events: none; z-index: 0;
+            background:
+                radial-gradient(1200px 600px at 10% -10%, rgba(10,10,10,.035), transparent 60%),
+                radial-gradient(900px 500px at 110% 110%, rgba(183,121,31,.035), transparent 55%);
+        }
+        #app-container { position: relative; z-index: 1; }
+
+        /* Tipografia utilitária */
+        .eyebrow {
+            font-size: 10.5px; font-weight: 600; color: var(--ink-3);
+            text-transform: uppercase; letter-spacing: 0.14em;
+        }
+        .display-num {
+            font-family: 'Inter', sans-serif;
+            font-feature-settings: 'tnum';
+            font-weight: 700; letter-spacing: -0.03em; line-height: 1;
+            color: var(--ink);
+        }
+        .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-feature-settings: 'tnum'; }
+
         /* ── Animações ── */
-        .animate-fadeIn { animation: fadeIn 0.18s ease-out; }
+        .animate-fadeIn { animation: fadeIn 0.22s cubic-bezier(.2,.7,.3,1); }
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(4px); }
+            from { opacity: 0; transform: translateY(6px); }
             to   { opacity: 1; transform: translateY(0); }
         }
-        .animate-slideIn { animation: slideIn 0.22s cubic-bezier(.25,.46,.45,.94); }
+        .animate-slideIn { animation: slideIn 0.24s cubic-bezier(.25,.46,.45,.94); }
         @keyframes slideIn {
             from { opacity: 0; transform: translateX(12px); }
             to   { opacity: 1; transform: translateX(0); }
         }
 
         /* ── Scrollbar ── */
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 2px; }
+        ::-webkit-scrollbar-thumb { background: rgba(10,10,10,.18); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(10,10,10,.32); }
 
         /* ── Loaders ── */
         .loader {
-            border: 2px solid rgba(0,0,0,.1);
-            border-top: 2px solid var(--apple-blue);
-            border-radius: 50%; width: 28px; height: 28px;
+            border: 2px solid rgba(10,10,10,.08);
+            border-top: 2px solid var(--ink);
+            border-radius: 50%; width: 26px; height: 26px;
             animation: spin .7s linear infinite;
         }
         .loader_small_blue {
-            border: 1.5px solid rgba(255,255,255,.4);
+            border: 1.5px solid rgba(255,255,255,.35);
             border-top: 1.5px solid #fff;
             border-radius: 50%; width: 13px; height: 13px;
             animation: spin .7s linear infinite;
@@ -73,12 +137,13 @@
 
         /* ── Form controls ── */
         select, input[type="text"], input[type="email"],
-        input[type="password"], input[type="date"], textarea {
+        input[type="password"], input[type="date"], input[type="number"], textarea {
             appearance: none; -webkit-appearance: none; -moz-appearance: none;
             background-image: none;
+            font-family: inherit;
         }
         select {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2386868b'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2382827e'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 10px center;
             background-size: 1em 1em;
@@ -86,236 +151,374 @@
         }
         textarea { resize: vertical; }
 
-        /* ── Apple Card ── */
+        /* ── Card executivo ── */
         .exec-card {
-            background: var(--apple-surface);
-            border: 1px solid var(--apple-border);
-            border-radius: 12px;
-            box-shadow: 0 1px 0 rgba(0,0,0,.04);
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-lg);
+            box-shadow:
+                0 1px 0 rgba(10,10,10,.02),
+                0 1px 3px rgba(10,10,10,.03);
+        }
+        .exec-card--elevated {
+            box-shadow:
+                0 1px 0 rgba(10,10,10,.02),
+                0 12px 32px -12px rgba(10,10,10,.14);
         }
 
-        /* ── Apple Input ── */
+        /* ── Inputs ── */
         .apple-input {
             width: 100%;
-            padding: 9px 13px;
-            background: var(--apple-bg);
-            border: 1px solid transparent;
-            border-radius: 8px;
-            color: var(--apple-text);
-            font-size: 15px;
+            padding: 10px 13px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            color: var(--ink);
+            font-size: 14px;
             font-family: inherit;
             outline: none;
             transition: border-color .15s, box-shadow .15s;
         }
-        .apple-input::placeholder { color: var(--apple-3rd); }
+        .apple-input::placeholder { color: var(--ink-4); }
         .apple-input:focus {
-            background: var(--apple-surface);
-            border-color: var(--apple-blue);
-            box-shadow: 0 0 0 3px rgba(0, 113, 227, .2);
+            background: var(--surface);
+            border-color: var(--ink);
+            box-shadow: 0 0 0 3px rgba(10, 10, 10, .09);
         }
 
-        /* ── Apple Button ── */
+        /* ── Botões ── */
         .btn-primary {
-            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-            padding: 9px 18px;
-            background: var(--apple-blue);
+            display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+            padding: 10px 18px;
+            background: var(--ink);
             color: #fff;
-            border: none; border-radius: 8px;
-            font-size: 14px; font-weight: 600; font-family: inherit;
-            cursor: pointer; transition: background .15s;
+            border: 1px solid var(--ink);
+            border-radius: 10px;
+            font-size: 13px; font-weight: 600; font-family: inherit;
+            letter-spacing: -.005em;
+            cursor: pointer; transition: background .15s, transform .06s ease;
             white-space: nowrap;
         }
-        .btn-primary:hover { background: var(--apple-blue-h); }
-        .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+        .btn-primary:hover { background: #2a2a2a; }
+        .btn-primary:active { transform: translateY(1px); }
+        .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
 
         .btn-secondary {
             display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-            padding: 8px 16px;
-            background: var(--apple-bg);
-            color: var(--apple-text);
-            border: 1px solid var(--apple-border); border-radius: 8px;
+            padding: 9px 15px;
+            background: var(--surface);
+            color: var(--ink);
+            border: 1px solid var(--line-strong);
+            border-radius: 10px;
             font-size: 13px; font-weight: 500; font-family: inherit;
-            cursor: pointer; transition: background .12s;
+            cursor: pointer; transition: background .12s, border-color .12s;
             white-space: nowrap;
         }
-        .btn-secondary:hover { background: #ebebed; }
+        .btn-secondary:hover { background: var(--bg-alt); border-color: rgba(10,10,10,.28); }
+
+        .btn-accent {
+            display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+            padding: 10px 18px;
+            background: var(--accent);
+            color: #fff;
+            border: 1px solid var(--accent);
+            border-radius: 10px;
+            font-size: 13px; font-weight: 600; font-family: inherit;
+            cursor: pointer; transition: background .15s;
+            white-space: nowrap;
+        }
+        .btn-accent:hover { background: var(--accent-h); border-color: var(--accent-h); }
+        .btn-accent:disabled { opacity: .45; cursor: not-allowed; }
 
         .btn-danger {
             display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-            padding: 8px 16px;
-            background: none; color: var(--apple-red);
-            border: 1px solid rgba(255,59,48,.2); border-radius: 8px;
+            padding: 8px 14px;
+            background: var(--surface); color: var(--danger);
+            border: 1px solid rgba(127,29,29,.25); border-radius: 10px;
             font-size: 13px; font-weight: 500; font-family: inherit;
             cursor: pointer; transition: background .12s;
         }
-        .btn-danger:hover { background: rgba(255,59,48,.06); }
+        .btn-danger:hover { background: var(--danger-bg); }
 
-        /* ── Apple Action Card (dashboard tile) ── */
+        /* ── Action Card (dashboard tile) — monocromático, com marca lateral ── */
         .action-card {
-            background: var(--apple-surface);
-            border: 1px solid var(--apple-border);
-            border-radius: 12px;
-            padding: 22px 16px;
+            position: relative;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-lg);
+            padding: 20px 18px 18px 22px;
             display: flex; flex-direction: column; align-items: flex-start;
             text-align: left;
             cursor: pointer;
-            transition: box-shadow .15s;
+            transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+            overflow: hidden;
+        }
+        .action-card::before {
+            content: "";
+            position: absolute; left: 0; top: 14px; bottom: 14px; width: 2px;
+            background: var(--ink);
+            opacity: 0; transition: opacity .18s ease;
+            border-radius: 2px;
         }
         .action-card:hover {
-            box-shadow: 0 4px 14px rgba(0,0,0,.09);
+            transform: translateY(-2px);
+            border-color: var(--line-strong);
+            box-shadow: 0 14px 36px -18px rgba(10,10,10,.22), 0 2px 6px rgba(10,10,10,.04);
         }
+        .action-card:hover::before { opacity: 1; }
+        .action-card p { line-height: 1.35; }
 
-        /* ── QM Badges — monocromático ── */
+        /* Ícone das actions — monocromático em todas as tiles */
+        .action-icon {
+            width: 36px; height: 36px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 10px;
+            background: var(--bg-alt);
+            color: var(--ink);
+            margin-bottom: 14px;
+            flex-shrink: 0;
+            border: 1px solid var(--line);
+        }
+        .action-icon svg { stroke: var(--ink); }
+
+        /* ── QM Badges — hierarquia clara em preto e branco + acento ── */
         .badge-qm {
             display: inline-block;
-            padding: 1px 7px; border-radius: 4px;
-            font-size: 12px; font-weight: 700;
-            background: var(--apple-bg);
-            color: var(--apple-text);
-            border: 1px solid var(--apple-border);
-            letter-spacing: .01em;
+            padding: 2px 8px; border-radius: 4px;
+            font-size: 11px; font-weight: 700;
+            background: var(--bg-alt);
+            color: var(--ink);
+            border: 1px solid var(--line);
+            letter-spacing: .04em;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
         }
-        .badge-qm-a { color: #1d1d1f; }
-        .badge-qm-b { color: #1d1d1f; }
-        .badge-qm-c { color: var(--apple-blue); border-color: rgba(0,113,227,.15); background: rgba(0,113,227,.06); }
-        .badge-qm-d { color: var(--apple-3rd); }
+        .badge-qm-a { background: var(--ink); color: #fff; border-color: var(--ink); }
+        .badge-qm-b { background: #fff; color: var(--ink); border-color: var(--line-strong); }
+        .badge-qm-c { background: var(--accent-soft); color: var(--accent-h); border-color: rgba(183,121,31,.25); }
+        .badge-qm-d { background: var(--bg-alt); color: var(--ink-3); border-color: var(--line); }
 
         /* ── Separador ── */
-        .apple-sep { height: 1px; background: var(--apple-sep); margin: 0; border: none; }
+        .apple-sep { height: 1px; background: var(--sep); margin: 0; border: none; }
 
         /* ── Filtros ── */
         .filter-wrapper {
-            background: var(--apple-surface);
-            padding: 16px;
-            border: 1px solid var(--apple-border);
-            border-radius: 12px;
+            background: var(--surface);
+            padding: 18px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius-lg);
         }
         .filter-group { display: flex; flex-direction: column; gap: 5px; }
         .filter-label {
-            font-size: 11px; font-weight: 600; color: var(--apple-2nd);
-            letter-spacing: .02em;
+            font-size: 10.5px; font-weight: 600; color: var(--ink-3);
+            letter-spacing: .08em; text-transform: uppercase;
         }
         .filter-input {
-            width: 100%; padding: 7px 10px;
-            background: var(--apple-bg);
-            border: 1px solid transparent; border-radius: 6px;
-            color: var(--apple-text); font-size: 13px; font-family: inherit;
-            outline: none; transition: border-color .12s, box-shadow .12s;
+            width: 100%; padding: 8px 11px;
+            background: var(--bg);
+            border: 1px solid transparent; border-radius: 8px;
+            color: var(--ink); font-size: 13px; font-family: inherit;
+            outline: none; transition: border-color .12s, box-shadow .12s, background .12s;
         }
         .filter-input:focus {
-            border-color: var(--apple-blue);
-            box-shadow: 0 0 0 2.5px rgba(0,113,227,.18);
+            background: var(--surface);
+            border-color: var(--ink);
+            box-shadow: 0 0 0 2.5px rgba(10,10,10,.08);
         }
         .filter-toggle summary {
             cursor: pointer; user-select: none;
             display: flex; justify-content: space-between; align-items: center;
             padding: 7px 2px;
-            font-size: 12px; font-weight: 600; color: var(--apple-2nd);
+            font-size: 11px; font-weight: 600; color: var(--ink-2);
+            text-transform: uppercase; letter-spacing: .08em;
         }
         .filter-toggle summary::-webkit-details-marker { display: none; }
 
         /* ── Tabela ── */
+        .tbl { width: 100%; border-collapse: separate; border-spacing: 0; }
         .tbl th {
-            padding: 8px 14px;
-            font-size: 11px; font-weight: 600;
-            color: var(--apple-2nd);
-            background: var(--apple-bg);
-            border-bottom: 1px solid var(--apple-border);
+            padding: 10px 14px;
+            font-size: 10.5px; font-weight: 600;
+            color: var(--ink-3);
+            background: var(--surface-2);
+            border-bottom: 1px solid var(--line);
             text-align: left;
-            letter-spacing: .01em;
+            letter-spacing: .08em;
+            text-transform: uppercase;
             white-space: nowrap;
             position: sticky; top: 0; z-index: 1;
         }
         .tbl td {
-            padding: 9px 14px; font-size: 13px;
-            color: var(--apple-text);
-            border-bottom: 1px solid var(--apple-sep);
+            padding: 11px 14px; font-size: 13px;
+            color: var(--ink);
+            border-bottom: 1px solid var(--sep);
             vertical-align: middle;
         }
         .tbl tr:last-child td { border-bottom: none; }
-        .tbl tbody tr:hover td { background: rgba(0,0,0,.018); }
+        .tbl tbody tr { transition: background .1s; }
+        .tbl tbody tr:hover td { background: rgba(10,10,10,.022); }
 
         /* Wrapper para tabela com altura dinâmica */
         .tbl-scroll-wrap {
             overflow: auto;
             max-height: calc(100vh - 260px);
             min-height: 300px;
+            background: var(--surface);
+            border-radius: 12px;
         }
 
         /* ── Avatar ── */
         .avatar {
-            width: 28px; height: 28px; border-radius: 50%;
-            background: var(--apple-blue);
+            width: 32px; height: 32px; border-radius: 50%;
+            background: var(--ink);
             display: flex; align-items: center; justify-content: center;
-            font-size: 11px; font-weight: 700; color: #fff;
+            font-size: 12px; font-weight: 700; color: #fff;
             flex-shrink: 0; letter-spacing: -.01em;
+            border: 1px solid var(--ink);
         }
 
-        /* ── Header Apple ── */
+        /* ── Header ── */
         #app-header {
-            background: rgba(255,255,255,.88);
+            background: rgba(255,255,255,.82);
             backdrop-filter: saturate(180%) blur(20px);
             -webkit-backdrop-filter: saturate(180%) blur(20px);
-            border-bottom: 1px solid var(--apple-border);
+            border-bottom: 1px solid var(--line);
+        }
+        #app-header .brand-mark {
+            font-family: 'Instrument Serif', 'Playfair Display', Georgia, serif;
+            font-size: 18px; font-weight: 400; letter-spacing: 0.005em;
+            color: var(--ink);
+            font-style: italic;
         }
 
         /* ── Section label ── */
         .section-label {
-            font-size: 13px; font-weight: 600; color: var(--apple-2nd);
-            margin-bottom: 10px; padding-left: 1px;
+            font-size: 10.5px; font-weight: 600; color: var(--ink-3);
+            margin-bottom: 12px; padding-left: 1px;
+            text-transform: uppercase; letter-spacing: .12em;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .section-label::after {
+            content: ""; flex: 1; height: 1px; background: var(--sep);
         }
 
         /* ── Stat number ── */
         .stat-num {
-            font-size: 28px; font-weight: 700; color: var(--apple-text);
-            letter-spacing: -.02em; line-height: 1;
+            font-size: 30px; font-weight: 700; color: var(--ink);
+            letter-spacing: -.03em; line-height: 1;
+            font-feature-settings: 'tnum';
         }
-        .stat-label { font-size: 12px; color: var(--apple-3rd); margin-top: 3px; }
-
-        /* ── Icon action ── */
-        .action-icon {
-            width: 36px; height: 36px;
-            display: flex; align-items: center; justify-content: center;
-            border-radius: 8px; background: var(--apple-bg);
-            margin-bottom: 12px; flex-shrink: 0;
+        .stat-label {
+            font-size: 10.5px; color: var(--ink-3); margin-top: 6px;
+            text-transform: uppercase; letter-spacing: .1em; font-weight: 600;
+        }
+        .stat-tile {
+            background: var(--surface-2);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 16px 18px;
+            position: relative;
         }
 
         /* ── Analytics ── */
         .an-kpi {
-            background: var(--apple-surface);
-            border: 1px solid var(--apple-border);
+            background: var(--surface);
+            border: 1px solid var(--line);
             border-radius: 12px;
-            padding: 15px 16px;
+            padding: 16px 18px;
+            position: relative;
+            overflow: hidden;
         }
-        .an-kpi-num { font-size: 25px; font-weight: 700; color: var(--apple-text); letter-spacing: -.02em; line-height: 1.05; }
-        .an-kpi-label { font-size: 11px; color: var(--apple-3rd); margin-top: 5px; text-transform: uppercase; letter-spacing: .03em; font-weight: 600; }
-        .an-kpi-sub { font-size: 11px; color: var(--apple-2nd); margin-top: 3px; }
+        .an-kpi::before {
+            content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+            background: var(--ink); opacity: .8;
+        }
+        .an-kpi-num {
+            font-size: 26px; font-weight: 700; color: var(--ink);
+            letter-spacing: -.025em; line-height: 1.05;
+            font-feature-settings: 'tnum';
+        }
+        .an-kpi-label {
+            font-size: 10.5px; color: var(--ink-3); margin-top: 6px;
+            text-transform: uppercase; letter-spacing: .1em; font-weight: 600;
+        }
+        .an-kpi-sub { font-size: 11px; color: var(--ink-2); margin-top: 4px; }
         .an-card {
-            background: var(--apple-surface);
-            border: 1px solid var(--apple-border);
+            background: var(--surface);
+            border: 1px solid var(--line);
             border-radius: 12px;
-            padding: 18px 18px 20px;
+            padding: 20px 20px 22px;
         }
-        .an-card h3 { font-size: 14px; font-weight: 700; color: var(--apple-text); }
-        .an-card .an-sub { font-size: 11px; color: var(--apple-3rd); margin-top: 1px; }
-        .an-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+        .an-card h3 { font-size: 14px; font-weight: 700; color: var(--ink); letter-spacing: -.01em; }
+        .an-card .an-sub { font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+        .an-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
         .an-row:last-child { margin-bottom: 0; }
-        .an-row-label { font-size: 12px; color: var(--apple-text); width: 132px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .an-track { flex: 1; background: var(--apple-bg); border-radius: 6px; height: 22px; overflow: hidden; display: flex; }
-        .an-fill { height: 100%; display: flex; align-items: center; border-radius: 6px 0 0 6px; transition: width .4s ease; min-width: 2px; }
-        .an-row-val { font-size: 12px; font-weight: 700; color: var(--apple-text); width: 78px; text-align: right; flex-shrink: 0; }
+        .an-row-label { font-size: 12px; color: var(--ink); width: 132px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .an-track { flex: 1; background: var(--bg-alt); border-radius: 4px; height: 20px; overflow: hidden; display: flex; }
+        .an-fill { height: 100%; display: flex; align-items: center; border-radius: 4px 0 0 4px; transition: width .4s ease; min-width: 2px; background: var(--ink); }
+        .an-row-val {
+            font-size: 12px; font-weight: 700; color: var(--ink);
+            width: 82px; text-align: right; flex-shrink: 0;
+            font-feature-settings: 'tnum';
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+        }
         .an-hm-cell {
             text-align: center; font-size: 12px; font-weight: 600;
-            padding: 8px 4px; border-radius: 6px; color: var(--apple-text);
+            padding: 8px 4px; border-radius: 4px; color: var(--ink);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
         }
-        .an-legend-dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
-        .an-bars { display: flex; align-items: flex-end; gap: 4px; height: 150px; }
-        .an-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 5px; min-width: 0; }
-        .an-bar { width: 100%; max-width: 34px; background: var(--apple-blue); border-radius: 4px 4px 0 0; transition: height .4s ease; min-height: 2px; }
-        .an-bar-x { font-size: 9px; color: var(--apple-3rd); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-        .an-chip { display:inline-flex; align-items:center; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--apple-border); background: var(--apple-surface); color: var(--apple-2nd); }
-        .an-chip.active { background: var(--apple-blue); color: #fff; border-color: var(--apple-blue); }
-        .an-empty { text-align:center; padding: 28px 10px; color: var(--apple-3rd); font-size: 13px; }
+        .an-legend-dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+        .an-bar-x { font-size: 10px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; letter-spacing: .04em; }
+        .an-chip {
+            display: inline-flex; align-items: center;
+            padding: 5px 12px; border-radius: 999px;
+            font-size: 12px; font-weight: 600; cursor: pointer;
+            border: 1px solid var(--line-strong);
+            background: var(--surface); color: var(--ink-2);
+            transition: all .12s ease;
+        }
+        .an-chip:hover { color: var(--ink); border-color: rgba(10,10,10,.35); }
+        .an-chip.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+        .an-empty { text-align:center; padding: 32px 10px; color: var(--ink-3); font-size: 13px; }
+
+        /* Hero dashboard card — apresentação da faixa superior */
+        .hero-card {
+            background:
+                linear-gradient(180deg, rgba(10,10,10,0) 0%, rgba(10,10,10,.02) 100%),
+                var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 26px 28px;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero-card::after {
+            content: "";
+            position: absolute; right: -80px; top: -80px;
+            width: 260px; height: 260px; border-radius: 50%;
+            background: radial-gradient(circle at center, rgba(183,121,31,.08), transparent 65%);
+            pointer-events: none;
+        }
+        .hero-title {
+            font-family: 'Instrument Serif', Georgia, serif;
+            font-size: 30px; font-weight: 400; line-height: 1.15;
+            letter-spacing: -.01em; color: var(--ink);
+        }
+        .role-tag {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 10px;
+            background: var(--surface); border: 1px solid var(--line-strong);
+            border-radius: 999px;
+            font-size: 10.5px; font-weight: 700;
+            color: var(--ink); text-transform: uppercase; letter-spacing: .1em;
+        }
+        .role-tag::before {
+            content: ""; width: 6px; height: 6px; border-radius: 50%;
+            background: var(--accent);
+        }
+
+        /* Chart primaries — quando a série é única */
+        .chart-primary { background: var(--ink) !important; }
+        .chart-accent  { background: var(--accent) !important; }
     </style>
 </head>
 <body>
@@ -324,10 +527,10 @@
         <header id="app-header" class="px-5 py-3 hidden sticky top-0 z-40">
             <div class="max-w-screen-xl mx-auto flex justify-between items-center">
                 <div class="flex items-center gap-3">
-                    <img src="favicon.png" alt="Logo Botafogo" class="h-8 w-8 rounded-lg object-contain">
-                    <div class="leading-tight">
-                        <p class="text-sm font-bold tracking-tight" style="color:var(--apple-text)">Portal QM</p>
-                        <p class="text-xs" style="color:var(--apple-3rd)">SAF Botafogo</p>
+                    <img src="favicon.png" alt="Logo SAF Botafogo" class="h-9 w-9 object-contain" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.12))">
+                    <div class="leading-tight" style="border-left:1px solid var(--line);padding-left:12px">
+                        <p class="brand-mark">Quadro Móvel</p>
+                        <p class="eyebrow" style="margin-top:1px">SAF Botafogo</p>
                     </div>
                 </div>
                 <div id="user-info-header" class="flex items-center gap-2"></div>
@@ -477,9 +680,9 @@
         function showNotification(message, type = 'info', duration = 4000) {
             const id = `notif-${Date.now()}`;
             const cfg = {
-                error:   { bg: '#fff1f2', border: '#fecdd3', dot: '#f43f5e', label: 'Erro',    icon: `<svg width="16" height="16" fill="none" stroke="#f43f5e" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>` },
-                success: { bg: '#f0fdf4', border: '#bbf7d0', dot: '#22c55e', label: 'Sucesso', icon: `<svg width="16" height="16" fill="none" stroke="#22c55e" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>` },
-                info:    { bg: '#eff6ff', border: '#bfdbfe', dot: '#3b82f6', label: 'Info',    icon: `<svg width="16" height="16" fill="none" stroke="#3b82f6" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>` }
+                error:   { accent: '#7f1d1d', label: 'Erro',    icon: `<svg width="16" height="16" fill="none" stroke="#7f1d1d" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>` },
+                success: { accent: '#14532d', label: 'Sucesso', icon: `<svg width="16" height="16" fill="none" stroke="#14532d" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>` },
+                info:    { accent: '#0a0a0a', label: 'Aviso',   icon: `<svg width="16" height="16" fill="none" stroke="#0a0a0a" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>` }
             };
             const c = cfg[type] || cfg.info;
 
@@ -487,19 +690,21 @@
             notificationDiv.id = id;
             notificationDiv.className = 'animate-slideIn pointer-events-auto';
             notificationDiv.style.cssText = `
-                background: ${c.bg}; border: 1px solid ${c.border};
-                border-radius: 12px; padding: 12px 14px;
+                background: #ffffff;
+                border: 1px solid var(--line-strong);
+                border-left: 3px solid ${c.accent};
+                border-radius: 10px; padding: 12px 14px;
                 display: flex; align-items: flex-start; gap: 10px;
-                box-shadow: 0 4px 20px rgba(0,0,0,.1), 0 1px 4px rgba(0,0,0,.06);
+                box-shadow: 0 12px 32px -8px rgba(10,10,10,.18), 0 2px 6px rgba(10,10,10,.06);
                 font-family: 'Inter', sans-serif;
             `;
             notificationDiv.innerHTML = `
                 <div style="flex-shrink:0; margin-top:1px">${c.icon}</div>
                 <div style="flex:1; min-width:0">
-                    <p style="font-size:12px; font-weight:700; color:#0f172a; margin:0 0 2px">${c.label}</p>
-                    <p style="font-size:12px; color:#475569; margin:0; line-height:1.4; word-break:break-word">${message}</p>
+                    <p style="font-size:10.5px; font-weight:700; color:${c.accent}; margin:0 0 3px; text-transform:uppercase; letter-spacing:.1em">${c.label}</p>
+                    <p style="font-size:12.5px; color:var(--ink); margin:0; line-height:1.45; word-break:break-word">${message}</p>
                 </div>
-                <button onclick="document.getElementById('${id}').remove()" style="flex-shrink:0; background:none; border:none; cursor:pointer; padding:2px; color:#94a3b8; line-height:1; margin-top:1px">
+                <button onclick="document.getElementById('${id}').remove()" style="flex-shrink:0; background:none; border:none; cursor:pointer; padding:2px; color:var(--ink-4); line-height:1; margin-top:1px">
                     <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
             `;
@@ -1328,13 +1533,12 @@
             appContent.innerHTML = `
                 <div class="flex items-center justify-center min-h-[calc(100vh-80px)] p-4 animate-fadeIn">
                     <div class="w-full max-w-[360px]">
-                        <div class="exec-card p-8">
+                        <div class="exec-card exec-card--elevated" style="padding:36px 32px">
                             <div class="flex flex-col items-center mb-8">
-                                <div class="w-16 h-16 rounded-2xl bg-slate-900 flex items-center justify-center mb-5 shadow-lg">
-                                    <img src="favicon.png" alt="Logo" class="h-10 w-10 object-contain">
-                                </div>
-                                <h2 class="text-2xl font-bold text-slate-900 text-center tracking-tight">Portal QM</h2>
-                                <p class="text-slate-500 mt-1.5 text-sm text-center">SAF Botafogo — Acesso restrito</p>
+                                <img src="favicon.png" alt="Logo SAF Botafogo" class="h-14 w-14 object-contain mb-5" style="filter:drop-shadow(0 2px 6px rgba(0,0,0,.12))">
+                                <p class="eyebrow">SAF Botafogo</p>
+                                <h2 class="hero-title" style="font-size:26px;margin-top:6px;text-align:center">Quadro Móvel</h2>
+                                <p style="font-size:12.5px;color:var(--ink-3);margin-top:8px;text-align:center;max-width:260px">Acesso restrito ao portal executivo de indicadores de QM.</p>
                             </div>
                             <form id="login-form" class="space-y-4">
                                 <div>
@@ -1350,7 +1554,7 @@
                                     Entrar
                                 </button>
                                 <p class="text-center text-xs text-slate-500 mt-1">
-                                    <a href="#" id="first-access-link" class="text-blue-600 hover:text-blue-700 font-medium hover:underline">Primeiro acesso ou esqueceu a senha?</a>
+                                    <a href="#" id="first-access-link" style="color:var(--ink);font-weight:600;text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px">Primeiro acesso ou esqueceu a senha?</a>
                                 </p>
                             </form>
                         </div>
@@ -1379,11 +1583,11 @@
                     <div class="w-full max-w-[360px]">
                         <div class="exec-card p-8">
                             <div class="flex flex-col items-center mb-8">
-                                <div class="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center mb-4 shadow-md">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                                <div style="width:52px;height:52px;border-radius:14px;background:var(--ink);display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
                                 </div>
-                                <h2 class="text-xl font-bold text-slate-900 text-center">Redefinir Senha</h2>
-                                <p class="text-slate-500 mt-1.5 text-sm text-center">Informe seu e-mail para receber o link.</p>
+                                <h2 class="hero-title" style="font-size:22px;text-align:center">Redefinir Senha</h2>
+                                <p style="font-size:12.5px;color:var(--ink-3);margin-top:6px;text-align:center">Informe seu e-mail para receber o link.</p>
                             </div>
                             <form id="first-access-form" class="space-y-4">
                                 <div>
@@ -1394,7 +1598,7 @@
                                     Enviar Link
                                 </button>
                                 <p class="text-center text-xs text-slate-500">
-                                    <a href="#" id="back-to-login-link" class="text-blue-600 hover:text-blue-700 font-medium hover:underline">← Voltar ao login</a>
+                                    <a href="#" id="back-to-login-link" style="color:var(--ink);font-weight:600;text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px">← Voltar ao login</a>
                                 </p>
                             </form>
                         </div>
@@ -1499,7 +1703,7 @@
                                     Criar Administrador
                                 </button>
                                 <p class="text-center text-xs">
-                                    <a href="#" id="back-to-login-setup" class="text-blue-600 hover:text-blue-700 font-medium hover:underline">← Voltar ao login</a>
+                                    <a href="#" id="back-to-login-setup" style="color:var(--ink);font-weight:600;text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px">← Voltar ao login</a>
                                 </p>
                             </form>
                         </div>
@@ -1605,7 +1809,7 @@
                                     Salvar Nova Senha
                                 </button>
                                 <p class="text-center text-xs">
-                                    <button type="button" id="back-to-dashboard-change-password" class="text-blue-600 hover:text-blue-700 font-medium hover:underline">← Voltar ao Painel</button>
+                                    <button type="button" id="back-to-dashboard-change-password" style="color:var(--ink);font-weight:600;text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px">← Voltar ao Painel</button>
                                 </p>
                             </form>
                         </div>
@@ -1660,68 +1864,75 @@
             const totalRecords = globalData.records.length;
             const thisMonth = new Date().toISOString().slice(0,7);
             const monthRecords = globalData.records.filter(r => r.eventDate && r.eventDate.startsWith(thisMonth)).length;
+            const mgrSectorsArr = getUserSectors(userProfile);
             appContent.innerHTML = `
-                <div class="animate-fadeIn space-y-6">
-                    <div class="exec-card p-6">
-                        <div class="flex items-center gap-4">
-                            <div class="avatar" style="width:48px;height:48px;font-size:16px">${userProfile.name.charAt(0).toUpperCase()}</div>
-                            <div>
-                                <p style="font-size:11px;font-weight:600;color:var(--apple-2nd);letter-spacing:.04em">Bem-vindo</p>
-                                <h2 style="font-size:20px;font-weight:700;color:var(--apple-text)">${userProfile.name}</h2>
-                                <p style="font-size:13px;color:var(--apple-3rd);margin-top:2px">Setor: <span style="font-weight:600;color:var(--apple-text)">${userProfile.sector}</span></p>
+                <div class="animate-fadeIn space-y-6 max-w-screen-xl mx-auto">
+                    <div class="hero-card">
+                        <div class="flex items-start justify-between gap-6">
+                            <div class="flex items-center gap-5">
+                                <div class="avatar" style="width:52px;height:52px;font-size:18px">${userProfile.name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase()}</div>
+                                <div>
+                                    <p class="eyebrow">Gestor</p>
+                                    <h2 class="hero-title" style="margin-top:4px">${userProfile.name}</h2>
+                                    <p style="font-size:12.5px;color:var(--ink-2);margin-top:6px">${mgrSectorsArr.length > 1 ? 'Setores' : 'Setor'}: <span style="font-weight:600;color:var(--ink)">${mgrSectorsArr.join(' · ') || '—'}</span></p>
+                                </div>
                             </div>
+                            <span class="role-tag">Gestor</span>
                         </div>
-                        <div class="grid grid-cols-2 gap-3 mt-5 pt-5" style="border-top:1px solid var(--apple-sep)">
-                            <div style="background:var(--apple-bg);border-radius:10px;padding:16px">
+                        <div class="grid grid-cols-2 gap-3 mt-6 pt-6" style="border-top:1px solid var(--sep)">
+                            <div class="stat-tile">
                                 <p class="stat-num">${totalRecords}</p>
                                 <p class="stat-label">Registros totais</p>
                             </div>
-                            <div style="background:var(--apple-bg);border-radius:10px;padding:16px">
+                            <div class="stat-tile">
                                 <p class="stat-num">${monthRecords}</p>
                                 <p class="stat-label">Neste mês</p>
                             </div>
                         </div>
                     </div>
-                    <button id="mgr-btn-analytics" class="exec-card p-5 w-full text-left" style="border-left:4px solid #6366f1;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px">
-                        <div style="display:flex;align-items:center;gap:14px">
-                            <div style="width:44px;height:44px;flex-shrink:0;border-radius:11px;background:#eef2ff;display:flex;align-items:center;justify-content:center">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#4f46e5" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
+
+                    <button id="mgr-btn-analytics" class="exec-card exec-card--elevated w-full text-left" style="padding:22px 26px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:24px;position:relative;overflow:hidden">
+                        <span style="position:absolute;left:0;top:22px;bottom:22px;width:3px;background:var(--ink);border-radius:2px"></span>
+                        <div style="display:flex;align-items:center;gap:18px">
+                            <div class="action-icon" style="width:48px;height:48px;margin-bottom:0;background:var(--ink);border-color:var(--ink)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
                             </div>
                             <div>
-                                <p style="font-size:15px;font-weight:700;color:var(--apple-text)">Analytics</p>
-                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:2px">Indicadores dos seus setores: eventos, profissionais e classificações de QM</p>
+                                <p style="font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.12em;font-weight:600">Analytics</p>
+                                <p style="font-size:17px;font-weight:700;color:var(--ink);margin-top:2px;letter-spacing:-.01em">Indicadores dos seus setores</p>
+                                <p style="font-size:12px;color:var(--ink-2);margin-top:3px">Eventos, profissionais e classificações de QM</p>
                             </div>
                         </div>
-                        <span style="flex-shrink:0;color:#6366f1;font-size:13px;font-weight:700;display:flex;align-items:center;gap:4px">Abrir <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg></span>
+                        <span style="flex-shrink:0;color:var(--ink);font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:.08em">Abrir <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg></span>
                     </button>
 
                     <div>
                         <p class="section-label">Ações</p>
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <button id="btn-new-record" class="action-card">
-                                <div class="action-icon" style="background:#eff6ff"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#2563eb" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg></div>
-                                <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Novo Registro</p>
-                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Incluir manualmente</p>
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg></div>
+                                <p style="font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-.005em">Novo Registro</p>
+                                <p style="font-size:12px;color:var(--ink-3);margin-top:4px">Incluir manualmente</p>
                             </button>
                             <button id="btn-import-records" class="action-card">
-                                <div class="action-icon" style="background:#f0fdf4"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#16a34a" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg></div>
-                                <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Importar Planilha</p>
-                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Excel / CSV</p>
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg></div>
+                                <p style="font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-.005em">Importar Planilha</p>
+                                <p style="font-size:12px;color:var(--ink-3);margin-top:4px">Excel / CSV</p>
                             </button>
                             <button id="btn-history" class="action-card">
-                                <div class="action-icon" style="background:#faf5ff"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#7c3aed" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z"/></svg></div>
-                                <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Histórico</p>
-                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Ver todos os registros</p>
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z"/></svg></div>
+                                <p style="font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-.005em">Histórico</p>
+                                <p style="font-size:12px;color:var(--ink-3);margin-top:4px">Ver todos os registros</p>
                             </button>
                             <button id="btn-historico-geral" class="action-card">
-                                <div class="action-icon" style="background:#fffbeb"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#d97706" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"/></svg></div>
-                                <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Arquivamento</p>
-                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Registros arquivados</p>
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"/></svg></div>
+                                <p style="font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-.005em">Arquivamento</p>
+                                <p style="font-size:12px;color:var(--ink-3);margin-top:4px">Registros arquivados</p>
                             </button>
                             <button id="btn-export-consolidada" class="action-card">
-                                <div class="action-icon" style="background:#ecfeff"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#0891b2" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5v6m0 0-3-3m3 3 3-3M3.75 6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v9A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6Z"/></svg></div>
-                                <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Exportar Base</p>
-                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Ativos + arquivados (XLSX)</p>
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5v6m0 0-3-3m3 3 3-3M3.75 6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v9A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6Z"/></svg></div>
+                                <p style="font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-.005em">Exportar Base</p>
+                                <p style="font-size:12px;color:var(--ink-3);margin-top:4px">Ativos + arquivados (XLSX)</p>
                             </button>
                         </div>
                     </div>
@@ -2884,91 +3095,96 @@
             const totalSectors = globalData.sectors.length;
 
             appContent.innerHTML = `
-                <div class="animate-fadeIn space-y-6">
-                    <div class="exec-card p-6">
-                        <div class="flex items-center justify-between">
+                <div class="animate-fadeIn space-y-6 max-w-screen-xl mx-auto">
+                    <div class="hero-card">
+                        <div class="flex items-start justify-between gap-6">
                             <div>
-                                <p style="font-size:11px;font-weight:600;color:var(--apple-2nd);letter-spacing:.04em">Painel Administrativo</p>
-                                <h2 style="font-size:20px;font-weight:700;color:var(--apple-text);margin-top:2px">Bem-vindo, ${userProfile.name}</h2>
+                                <p class="eyebrow">Painel Administrativo</p>
+                                <h2 class="hero-title" style="margin-top:6px">Bem-vindo, ${userProfile.name.split(' ')[0]}.</h2>
+                                <p style="font-size:13px;color:var(--ink-2);margin-top:6px;max-width:520px">Visão consolidada da operação de Quadro Móvel — eventos, setores, profissionais e classificações de QM.</p>
                             </div>
-                            <span style="padding:3px 10px;background:var(--apple-bg);color:var(--apple-2nd);font-size:11px;font-weight:700;border-radius:6px;border:1px solid var(--apple-border)">Admin</span>
+                            <span class="role-tag">Administrador</span>
                         </div>
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-5" style="border-top:1px solid var(--apple-sep)">
-                            <div style="background:var(--apple-bg);border-radius:10px;padding:16px">
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6" style="border-top:1px solid var(--sep)">
+                            <div class="stat-tile">
                                 <p class="stat-num">${totalRecords}</p>
                                 <p class="stat-label">Registros totais</p>
                             </div>
-                            <div style="background:var(--apple-bg);border-radius:10px;padding:16px">
+                            <div class="stat-tile">
                                 <p class="stat-num">${monthRecords}</p>
                                 <p class="stat-label">Neste mês</p>
                             </div>
-                            <div style="background:var(--apple-bg);border-radius:10px;padding:16px">
+                            <div class="stat-tile">
                                 <p class="stat-num">${totalEmployees}</p>
                                 <p class="stat-label">Funcionários</p>
                             </div>
-                            <div style="background:var(--apple-bg);border-radius:10px;padding:16px">
+                            <div class="stat-tile">
                                 <p class="stat-num">${totalSectors}</p>
                                 <p class="stat-label">Setores</p>
                             </div>
                         </div>
                     </div>
 
-                    <button id="admin-btn-analytics" class="exec-card p-5 w-full text-left" style="border-left:4px solid #6366f1;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px">
-                        <div style="display:flex;align-items:center;gap:14px">
-                            <div style="width:44px;height:44px;flex-shrink:0;border-radius:11px;background:#eef2ff;display:flex;align-items:center;justify-content:center">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#4f46e5" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
+                    <button id="admin-btn-analytics" class="exec-card exec-card--elevated w-full text-left" style="padding:22px 26px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:24px;position:relative;overflow:hidden">
+                        <span style="position:absolute;left:0;top:22px;bottom:22px;width:3px;background:var(--ink);border-radius:2px"></span>
+                        <div style="display:flex;align-items:center;gap:18px">
+                            <div class="action-icon" style="width:48px;height:48px;margin-bottom:0;background:var(--ink);border-color:var(--ink)">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
                             </div>
                             <div>
-                                <p style="font-size:15px;font-weight:700;color:var(--apple-text)">Analytics</p>
-                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:2px">Indicadores completos: eventos, setores, profissionais e classificações de QM</p>
+                                <p style="font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.12em;font-weight:600">Analytics</p>
+                                <p style="font-size:17px;font-weight:700;color:var(--ink);margin-top:2px;letter-spacing:-.01em">Indicadores executivos completos</p>
+                                <p style="font-size:12px;color:var(--ink-2);margin-top:3px">Eventos, setores, profissionais e distribuição de QM</p>
                             </div>
                         </div>
-                        <span style="flex-shrink:0;color:#6366f1;font-size:13px;font-weight:700;display:flex;align-items:center;gap:4px">Abrir <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg></span>
+                        <span style="flex-shrink:0;color:var(--ink);font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:.08em">Abrir <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg></span>
                     </button>
 
                     <div>
                         <p class="section-label">Ações Rápidas</p>
                         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
                             <button id="admin-btn-new-record" class="action-card">
-                                <div class="action-icon" style="background:#eff6ff"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#2563eb" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg></div>
-                                <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Novo Registro</p>
-                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Incluir manualmente</p>
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg></div>
+                                <p style="font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-.005em">Novo Registro</p>
+                                <p style="font-size:12px;color:var(--ink-3);margin-top:4px">Incluir manualmente</p>
                             </button>
                             <button id="admin-btn-import-records" class="action-card">
-                                <div class="action-icon" style="background:#f0fdf4"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#16a34a" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg></div>
-                                <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Importar Planilha</p>
-                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Excel / CSV</p>
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg></div>
+                                <p style="font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-.005em">Importar Planilha</p>
+                                <p style="font-size:12px;color:var(--ink-3);margin-top:4px">Excel / CSV</p>
                             </button>
                             <button id="admin-btn-history" class="action-card">
-                                <div class="action-icon" style="background:#faf5ff"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#7c3aed" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z"/></svg></div>
-                                <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Histórico Completo</p>
-                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Todos os setores</p>
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z"/></svg></div>
+                                <p style="font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-.005em">Histórico Completo</p>
+                                <p style="font-size:12px;color:var(--ink-3);margin-top:4px">Todos os setores</p>
                             </button>
                             <button id="admin-btn-historico-geral" class="action-card">
-                                <div class="action-icon" style="background:#fffbeb"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#d97706" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"/></svg></div>
-                                <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Arquivamento</p>
-                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Registros arquivados</p>
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"/></svg></div>
+                                <p style="font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-.005em">Arquivamento</p>
+                                <p style="font-size:12px;color:var(--ink-3);margin-top:4px">Registros arquivados</p>
                             </button>
                         </div>
                         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                             <button id="admin-btn-export-consolidada" class="action-card">
-                                <div class="action-icon" style="background:#ecfeff"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#0891b2" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5v6m0 0-3-3m3 3 3-3M3.75 6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v9A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6Z"/></svg></div>
-                                <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Exportar Base Consolidada</p>
-                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Ativos + arquivados (XLSX)</p>
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5v6m0 0-3-3m3 3 3-3M3.75 6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v9A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6Z"/></svg></div>
+                                <p style="font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-.005em">Exportar Base Consolidada</p>
+                                <p style="font-size:12px;color:var(--ink-3);margin-top:4px">Ativos + arquivados (XLSX)</p>
                             </button>
                         </div>
                     </div>
 
                     <div>
                         <p class="section-label">Arquivamento de Dados</p>
-                        <div class="exec-card p-5" style="border-left:4px solid #f59e0b">
+                        <div class="exec-card" style="padding:22px 24px;position:relative;overflow:hidden">
+                            <span style="position:absolute;left:0;top:22px;bottom:22px;width:3px;background:var(--accent);border-radius:2px"></span>
                             <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                <div>
-                                    <p style="font-size:14px;font-weight:700;color:#92400e">Guardar Dados</p>
-                                    <p style="font-size:12px;color:#78716c;margin-top:3px">Selecione quais registros ativos deseja mover para o Arquivamento. Você pode manter lançamentos que ainda não devem ser arquivados (ex: pertencem ao próximo período). Esta ação não pode ser desfeita.</p>
+                                <div style="max-width:640px">
+                                    <p class="eyebrow" style="color:var(--accent-h)">Guardar Dados</p>
+                                    <p style="font-size:15px;font-weight:700;color:var(--ink);margin-top:4px;letter-spacing:-.005em">Arquivar registros ativos do período</p>
+                                    <p style="font-size:12.5px;color:var(--ink-2);margin-top:6px;line-height:1.5">Selecione quais lançamentos mover para o Arquivamento. Registros que pertencem a outro período (ex.: jurídico do próximo mês) podem permanecer no quadro. Esta ação não pode ser desfeita.</p>
                                 </div>
-                                <button id="admin-btn-guardar-dados" style="flex-shrink:0;padding:10px 20px;background:#f59e0b;color:#fff;font-size:13px;font-weight:700;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;transition:background .2s" onmouseover="this.style.background='#d97706'" onmouseout="this.style.background='#f59e0b'">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"/></svg>
+                                <button id="admin-btn-guardar-dados" class="btn-accent" style="flex-shrink:0;padding:11px 20px">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"/></svg>
                                     Selecionar e Arquivar
                                 </button>
                             </div>
@@ -2979,24 +3195,24 @@
                         <p class="section-label">Gerenciamento do Sistema</p>
                         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                             <button id="admin-manage-categories" class="action-card py-5">
-                                <div class="action-icon" style="width:36px;height:36px;background:#eef2ff"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
-                                <p style="font-size:12px;font-weight:700;color:var(--apple-text);margin-top:8px">Categorias</p>
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+                                <p style="font-size:13px;font-weight:700;color:var(--ink);margin-top:6px;letter-spacing:-.005em">Categorias</p>
                             </button>
                             <button id="admin-manage-sectors" class="action-card py-5">
-                                <div class="action-icon" style="width:36px;height:36px;background:#f0fdfa"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
-                                <p style="font-size:12px;font-weight:700;color:var(--apple-text);margin-top:8px">Setores</p>
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+                                <p style="font-size:13px;font-weight:700;color:var(--ink);margin-top:6px;letter-spacing:-.005em">Setores</p>
                             </button>
                             <button id="admin-manage-employees" class="action-card py-5">
-                                <div class="action-icon" style="width:36px;height:36px;background:#eff6ff"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-                                <p style="font-size:12px;font-weight:700;color:var(--apple-text);margin-top:8px">Funcionários</p>
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+                                <p style="font-size:13px;font-weight:700;color:var(--ink);margin-top:6px;letter-spacing:-.005em">Funcionários</p>
                             </button>
                             <button id="admin-manage-rules" class="action-card py-5">
-                                <div class="action-icon" style="width:36px;height:36px;background:#fff7ed"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg></div>
-                                <p style="font-size:12px;font-weight:700;color:var(--apple-text);margin-top:8px">Regras</p>
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg></div>
+                                <p style="font-size:13px;font-weight:700;color:var(--ink);margin-top:6px;letter-spacing:-.005em">Regras</p>
                             </button>
                             <button id="admin-manage-users" class="action-card py-5">
-                                <div class="action-icon" style="width:36px;height:36px;background:#fdf4ff"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9333ea" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
-                                <p style="font-size:12px;font-weight:700;color:var(--apple-text);margin-top:8px">Usuários</p>
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+                                <p style="font-size:13px;font-weight:700;color:var(--ink);margin-top:6px;letter-spacing:-.005em">Usuários</p>
                             </button>
                         </div>
                     </div>
@@ -3479,9 +3695,9 @@
             if (!userProfile?.isAdmin && !userProfile?.isManager) { currentView = 'login'; renderApp(); return; }
             const backView = userProfile.isAdmin ? 'adminDashboard' : 'managerDashboard';
 
-            const QM_COLORS = { A: '#0071e3', B: '#34c759', C: '#ff9500', D: '#8e8e93' };
+            const QM_COLORS = { A: '#0a0a0a', B: '#4a4a48', C: '#b7791f', D: '#b5b5b0' };
             const QM_ORDER = ['A', 'B', 'C', 'D'];
-            const TYPE_COLORS = { jogo: '#0071e3', outros: '#ff9500' };
+            const TYPE_COLORS = { jogo: '#0a0a0a', outros: '#b7791f' };
             const WD_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
             const MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
@@ -3691,15 +3907,15 @@
                 })).sort((a, b) => (b.jogo + b.outros) - (a.jogo + a.outros)).slice(0, 10);
 
                 // Profissionais
-                const proByCount = toSorted(countBy(data, r => r.employeeName || 'N/A'), 12).map(i => ({ ...i, color: '#6366f1' }));
+                const proByCount = toSorted(countBy(data, r => r.employeeName || 'N/A'), 12).map(i => ({ ...i, color: '#0a0a0a' }));
                 const proByValue = toSorted(sumBy(data, r => r.employeeName || 'N/A', r => Number(r.qmValue) || 0), 10)
-                    .map(i => ({ ...i, color: '#0d9488' }));
+                    .map(i => ({ ...i, color: '#b7791f' }));
 
                 // Categorias de jogo
-                const byCategory = toSorted(countBy(data.filter(r => etOf(r) === 'jogo'), r => r.gameCategory), 12).map(i => ({ ...i, color: '#7c3aed' }));
+                const byCategory = toSorted(countBy(data.filter(r => etOf(r) === 'jogo'), r => r.gameCategory), 12).map(i => ({ ...i, color: '#4a4a48' }));
 
                 // Gestores
-                const byManager = toSorted(countBy(data, r => r.managerName), 10).map(i => ({ ...i, color: '#d97706' }));
+                const byManager = toSorted(countBy(data, r => r.managerName), 10).map(i => ({ ...i, color: '#82827e' }));
 
                 // Heatmap setor × QM
                 const hmSectors = sectorNames
