@@ -13,7 +13,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Biblioteca SheetJS para exportação/importação de XLSX -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
@@ -84,8 +84,8 @@
         }
         html, body { background: var(--bg); }
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
-            font-feature-settings: 'cv11', 'ss01', 'ss03', 'tnum';
+            font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-feature-settings: 'tnum', 'ss01';
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             color: var(--ink);
@@ -110,12 +110,12 @@
             text-transform: uppercase; letter-spacing: 0.14em;
         }
         .display-num {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Manrope', sans-serif;
             font-feature-settings: 'tnum';
             font-weight: 700; letter-spacing: -0.03em; line-height: 1;
             color: var(--ink);
         }
-        .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-feature-settings: 'tnum'; }
+        .mono { font-family: 'Manrope', sans-serif; font-feature-settings: 'tnum'; }
 
         /* ── Animações ── */
         .animate-fadeIn { animation: fadeIn 0.22s cubic-bezier(.2,.7,.3,1); }
@@ -311,7 +311,7 @@
             color: var(--ink);
             border: 1px solid var(--line);
             letter-spacing: .04em;
-            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-family: 'Manrope', sans-serif;
         }
         .badge-qm-a { background: var(--navy); color: #fff; border-color: var(--navy); box-shadow: 0 1px 0 rgba(255,255,255,.08) inset; }
         .badge-qm-b { background: var(--navy-soft); color: var(--navy); border-color: rgba(15,37,71,.24); }
@@ -406,10 +406,9 @@
             border-bottom: 1px solid var(--line);
         }
         #app-header .brand-mark {
-            font-family: 'Instrument Serif', 'Playfair Display', Georgia, serif;
-            font-size: 19px; font-weight: 400; letter-spacing: 0.005em;
+            font-family: 'Manrope', sans-serif;
+            font-size: 15px; font-weight: 700; letter-spacing: -.01em;
             color: var(--navy-deep);
-            font-style: italic;
         }
         #app-header .brand-mark::after {
             content: ""; display: inline-block; width: 4px; height: 4px;
@@ -493,12 +492,12 @@
             font-size: 12px; font-weight: 700; color: var(--ink);
             width: 82px; text-align: right; flex-shrink: 0;
             font-feature-settings: 'tnum';
-            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-family: 'Manrope', sans-serif;
         }
         .an-hm-cell {
             text-align: center; font-size: 12px; font-weight: 600;
             padding: 8px 4px; border-radius: 4px; color: var(--ink);
-            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-family: 'Manrope', sans-serif;
         }
         .an-legend-dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
         .an-bar-x { font-size: 10px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; letter-spacing: .04em; }
@@ -535,9 +534,9 @@
         }
         /* hero-card::after removido — o círculo dava aparência de blur mal-carregado */
         .hero-title {
-            font-family: 'Instrument Serif', Georgia, serif;
-            font-size: 30px; font-weight: 400; line-height: 1.15;
-            letter-spacing: -.01em; color: var(--navy-deep);
+            font-family: 'Manrope', sans-serif;
+            font-size: 26px; font-weight: 800; line-height: 1.15;
+            letter-spacing: -.025em; color: var(--navy-deep);
         }
         .role-tag {
             display: inline-flex; align-items: center; gap: 7px;
@@ -735,7 +734,7 @@
                 border-radius: 10px; padding: 12px 14px;
                 display: flex; align-items: flex-start; gap: 10px;
                 box-shadow: 0 12px 32px -8px rgba(10,10,10,.18), 0 2px 6px rgba(10,10,10,.06);
-                font-family: 'Inter', sans-serif;
+                font-family: 'Manrope', sans-serif;
             `;
             notificationDiv.innerHTML = `
                 <div style="flex-shrink:0; margin-top:1px">${c.icon}</div>
@@ -4190,13 +4189,13 @@
                     return `
                     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px" ${clickable}>
                         <div style="display:flex;align-items:center;gap:10px;min-width:0">
-                            <span style="width:22px;height:22px;flex-shrink:0;border-radius:50%;background:${idx===0?'var(--navy)':'var(--bg-alt)'};color:${idx===0?'#fff':'var(--ink-2)'};display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;font-family:'JetBrains Mono',monospace">${idx+1}</span>
+                            <span style="width:22px;height:22px;flex-shrink:0;border-radius:50%;background:${idx===0?'var(--navy)':'var(--bg-alt)'};color:${idx===0?'#fff':'var(--ink-2)'};display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;font-family:'Manrope',sans-serif">${idx+1}</span>
                             <div style="min-width:0">
                                 <p style="font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(i.label)}">${esc(i.label)}</p>
                                 ${i.sub ? `<p style="font-size:11px;color:var(--ink-3);margin-top:1px">${esc(i.sub)}</p>` : ''}
                             </div>
                         </div>
-                        <span style="font-size:12.5px;font-weight:700;color:var(--ink);font-family:'JetBrains Mono',monospace">${opts.fmt ? opts.fmt(i.value) : i.value}</span>
+                        <span style="font-size:12.5px;font-weight:700;color:var(--ink);font-family:'Manrope',sans-serif">${opts.fmt ? opts.fmt(i.value) : i.value}</span>
                     </div>`;
                 }).join('')}</div>`;
             };
@@ -4476,9 +4475,9 @@
                 });
                 const complianceTableHtml = (() => {
                     const cell = (v, isAnomaly) => {
-                        if (v === 0) return `<td style="text-align:center;padding:8px 6px;font-size:12px;color:var(--ink-4);font-family:'JetBrains Mono',monospace">·</td>`;
-                        if (isAnomaly) return `<td style="text-align:center;padding:8px 6px"><span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:rgba(127,29,29,.08);border:1px solid rgba(127,29,29,.35);border-radius:6px;color:var(--danger);font-weight:700;font-size:12px;font-family:'JetBrains Mono',monospace"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>${v}</span></td>`;
-                        return `<td style="text-align:center;padding:8px 6px;font-size:12px;font-weight:700;color:var(--ink);font-family:'JetBrains Mono',monospace">${v}</td>`;
+                        if (v === 0) return `<td style="text-align:center;padding:8px 6px;font-size:12px;color:var(--ink-4);font-family:'Manrope',sans-serif">·</td>`;
+                        if (isAnomaly) return `<td style="text-align:center;padding:8px 6px"><span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:rgba(127,29,29,.08);border:1px solid rgba(127,29,29,.35);border-radius:6px;color:var(--danger);font-weight:700;font-size:12px;font-family:'Manrope',sans-serif"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>${v}</span></td>`;
+                        return `<td style="text-align:center;padding:8px 6px;font-size:12px;font-weight:700;color:var(--ink);font-family:'Manrope',sans-serif">${v}</td>`;
                     };
                     const sectionRows = (dayType) => {
                         const rows = complianceRows.filter(r => r.dayType === dayType);
@@ -4515,10 +4514,10 @@
                                     <tr>
                                         <th style="text-align:left;padding:8px 12px;font-size:10.5px;color:var(--ink-3);font-weight:700;letter-spacing:.08em;text-transform:uppercase">Faixa horária</th>
                                         <th style="padding:8px 6px;font-size:10px;color:var(--ink-3);font-weight:700;letter-spacing:.06em;text-transform:uppercase;text-align:center">Esperado</th>
-                                        <th style="padding:8px 6px;font-size:11px;font-weight:700;text-align:center;color:${QM_COLORS.A};font-family:'JetBrains Mono',monospace">A</th>
-                                        <th style="padding:8px 6px;font-size:11px;font-weight:700;text-align:center;color:${QM_COLORS.B};font-family:'JetBrains Mono',monospace">B</th>
-                                        <th style="padding:8px 6px;font-size:11px;font-weight:700;text-align:center;color:${QM_COLORS.C};font-family:'JetBrains Mono',monospace">C</th>
-                                        <th style="padding:8px 6px;font-size:11px;font-weight:700;text-align:center;color:${QM_COLORS.D};font-family:'JetBrains Mono',monospace">D</th>
+                                        <th style="padding:8px 6px;font-size:11px;font-weight:700;text-align:center;color:${QM_COLORS.A};font-family:'Manrope',sans-serif">A</th>
+                                        <th style="padding:8px 6px;font-size:11px;font-weight:700;text-align:center;color:${QM_COLORS.B};font-family:'Manrope',sans-serif">B</th>
+                                        <th style="padding:8px 6px;font-size:11px;font-weight:700;text-align:center;color:${QM_COLORS.C};font-family:'Manrope',sans-serif">C</th>
+                                        <th style="padding:8px 6px;font-size:11px;font-weight:700;text-align:center;color:${QM_COLORS.D};font-family:'Manrope',sans-serif">D</th>
                                         <th style="padding:8px 6px;font-size:10.5px;color:var(--ink-3);font-weight:700;letter-spacing:.08em;text-transform:uppercase;text-align:center">Total</th>
                                     </tr>
                                 </thead>
@@ -4534,7 +4533,7 @@
                     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:14px;padding:12px 14px;background:${totalAnomalies>0?'rgba(127,29,29,.05)':'rgba(20,83,45,.05)'};border:1px solid ${totalAnomalies>0?'rgba(127,29,29,.2)':'rgba(20,83,45,.2)'};border-radius:10px">
                         <div>
                             <p style="font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.1em;font-weight:700">Conformidade</p>
-                            <p style="font-size:20px;font-weight:700;color:${totalAnomalies>0?'var(--danger)':'var(--success)'};margin-top:2px;font-family:'JetBrains Mono',monospace">${compliancePct}%</p>
+                            <p style="font-size:20px;font-weight:700;color:${totalAnomalies>0?'var(--danger)':'var(--success)'};margin-top:2px;font-family:'Manrope',sans-serif">${compliancePct}%</p>
                         </div>
                         <div style="text-align:right">
                             <p style="font-size:13px;font-weight:700;color:${totalAnomalies>0?'var(--danger)':'var(--success)'}">${totalAnomalies} anomalia(s)</p>
@@ -4740,6 +4739,31 @@
                 `;
             };
 
+            // Handler único (idempotente via onclick, sem acumular listeners)
+            const analyticsClickHandler = (ev) => {
+                const clear = ev.target.closest('#an-clear-focuses');
+                if (clear) {
+                    ev.stopPropagation();
+                    state.focuses = [];
+                    rerender();
+                    return;
+                }
+                const remove = ev.target.closest('[data-remove-focus]');
+                if (remove) {
+                    ev.stopPropagation();
+                    const raw = remove.dataset.removeFocus;
+                    const sep = raw.indexOf('::');
+                    const dim = raw.slice(0, sep);
+                    const val = raw.slice(sep + 2);
+                    toggleFocus(dim, val);
+                    return;
+                }
+                const t = ev.target.closest('[data-focus-dim]');
+                if (t) {
+                    toggleFocus(t.dataset.focusDim, t.dataset.focusVal, t.dataset.focusLabel);
+                }
+            };
+
             const rerender = () => {
                 const el = document.getElementById('an-content');
                 el.className = '';
@@ -4748,25 +4772,8 @@
                     state[ch.dataset.key] = ch.dataset.val;
                     rerender();
                 });
-                // Cross-filter — clique em qualquer elemento com data-focus-dim
-                el.addEventListener('click', (ev) => {
-                    const t = ev.target.closest('[data-focus-dim]');
-                    if (t) {
-                        toggleFocus(t.dataset.focusDim, t.dataset.focusVal, t.dataset.focusLabel);
-                        return;
-                    }
-                    const remove = ev.target.closest('[data-remove-focus]');
-                    if (remove) {
-                        const [dim, val] = remove.dataset.removeFocus.split('::');
-                        toggleFocus(dim, val);
-                        return;
-                    }
-                    if (ev.target.closest('#an-clear-focuses')) {
-                        state.focuses = [];
-                        rerender();
-                        return;
-                    }
-                }, { once: true }); // será re-attached em cada rerender
+                // onclick substitui — nunca duplica nem se esgota
+                el.onclick = analyticsClickHandler;
             };
 
             rerender();
