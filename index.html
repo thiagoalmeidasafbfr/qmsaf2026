@@ -4039,7 +4039,75 @@
             const archivedTagged = archived.map(r => ({ ...r, _src: 'arquivado' }));
             const allData = [...activeTagged, ...archivedTagged];
 
-            const state = { period: 'all', source: 'all' };
+            const state = { period: 'all', source: 'all', focuses: [] };
+
+            // Normalização/agrupamento de nomes (case + espaços)
+            const normalizeName = (s) => String(s || '').trim().toUpperCase().replace(/\s+/g, ' ');
+            const timeBucketOf = (t) => {
+                if (!t) return null;
+                const h = parseInt(String(t).split(':')[0], 10);
+                if (Number.isNaN(h)) return null;
+                if (h < 6) return 'Madrugada';
+                if (h < 12) return 'Manhã';
+                if (h < 18) return 'Tarde';
+                if (h < 21) return 'Noite';
+                return 'Prime 21+';
+            };
+
+            // Filtragem por focos ativos (cross-filter BI-like)
+            const matchFocus = (r, f) => {
+                switch (f.dim) {
+                    case 'employeeName': return (r.employeeName || '').toLowerCase() === String(f.val).toLowerCase();
+                    case 'sector':        return r.sector === f.val;
+                    case 'gameCategory':  return r.gameCategory === f.val;
+                    case 'managerName':   return r.managerName === f.val;
+                    case 'qmClassification': return r.qmClassification === f.val;
+                    case 'eventType':     return (r.eventType === 'outros' ? 'outros' : 'jogo') === f.val;
+                    case 'dayType': {
+                        if (!r.eventDate) return false;
+                        const dow = new Date(r.eventDate + 'T00:00:00').getDay();
+                        const isW = (dow === 0 || dow === 6);
+                        return f.val === 'fds' ? isW : !isW;
+                    }
+                    case 'timeBucket':    return timeBucketOf(r.gameTime) === f.val;
+                    case 'weekday':       {
+                        if (!r.eventDate) return false;
+                        return String(new Date(r.eventDate + 'T00:00:00').getDay()) === String(f.val);
+                    }
+                    case 'month':         return r.eventDate && r.eventDate.slice(0, 7) === f.val;
+                    case 'eventKey':      return normalizeName(r.eventName) === f.val;
+                    default: return true;
+                }
+            };
+            const applyFocuses = (rows) => state.focuses.length ? rows.filter(r => state.focuses.every(f => matchFocus(r, f))) : rows;
+
+            const toggleFocus = (dim, val, label) => {
+                const i = state.focuses.findIndex(f => f.dim === dim && String(f.val) === String(val));
+                if (i >= 0) { state.focuses.splice(i, 1); }
+                else {
+                    // Substitui foco anterior da mesma dimensão (mantém 1 por dimensão)
+                    const same = state.focuses.findIndex(f => f.dim === dim);
+                    if (same >= 0) state.focuses.splice(same, 1);
+                    state.focuses.push({ dim, val, label: label || val });
+                }
+                rerender();
+            };
+            const isActiveFocus = (dim, val) => state.focuses.some(f => f.dim === dim && String(f.val) === String(val));
+
+            // Helper: gera atributos para elementos clicáveis
+            const focusAttr = (dim, val, label) => {
+                if (!dim) return '';
+                const active = isActiveFocus(dim, val);
+                return `data-focus-dim="${esc(dim)}" data-focus-val="${esc(val)}" data-focus-label="${esc(label || val)}" style="cursor:pointer${active ? ';opacity:.55' : ''}"`;
+            };
+
+            // Rótulos amigáveis por dimensão (usados nos chips)
+            const DIM_LABELS = {
+                employeeName: 'Profissional', sector: 'Setor', gameCategory: 'Categoria',
+                managerName: 'Gestor', qmClassification: 'QM', eventType: 'Tipo',
+                dayType: 'Contexto', timeBucket: 'Faixa horária', weekday: 'Dia',
+                month: 'Mês', eventKey: 'Evento'
+            };
 
             // ---------- Componentes de gráfico (SVG/CSS puro) ----------
             const hbarChart = (items, opts = {}) => {
@@ -4049,7 +4117,11 @@
                 return items.map(i => {
                     const pct = i.value / max * 100;
                     const val = opts.fmt ? opts.fmt(i.value) : i.value;
-                    return `<div class="an-row">
+                    const fVal = opts.valueMap ? opts.valueMap(i) : i.label;
+                    const clickable = opts.filterDim
+                        ? `data-focus-dim="${esc(opts.filterDim)}" data-focus-val="${esc(fVal)}" data-focus-label="${esc(i.label)}" style="cursor:pointer${isActiveFocus(opts.filterDim, fVal) ? ';background:var(--navy-tint);border-radius:6px' : ''}"`
+                        : '';
+                    return `<div class="an-row" ${clickable}>
                         <span class="an-row-label" style="width:${lw}px" title="${esc(i.label)}">${esc(i.label)}</span>
                         <span class="an-track"><span class="an-fill" style="width:${pct}%;background:${i.color || 'var(--apple-blue)'}"></span></span>
                         <span class="an-row-val">${val}</span>
@@ -4066,7 +4138,11 @@
                     const total = segDefs.reduce((a, s) => a + (r[s.key] || 0), 0);
                     const fills = segDefs.map(s => (r[s.key] || 0) > 0
                         ? `<span class="an-fill" style="width:${(r[s.key] / max * 100)}%;background:${s.color};border-radius:0" title="${esc(s.label)}: ${r[s.key]}"></span>` : '').join('');
-                    return `<div class="an-row"><span class="an-row-label" style="width:${lw}px" title="${esc(r.label)}">${esc(r.label)}</span><span class="an-track">${fills}</span><span class="an-row-val">${total}</span></div>`;
+                    const fVal = opts.filterDim ? (opts.valueMap ? opts.valueMap(r) : r.label) : null;
+                    const clickable = opts.filterDim
+                        ? `data-focus-dim="${esc(opts.filterDim)}" data-focus-val="${esc(fVal)}" data-focus-label="${esc(r.label)}" style="cursor:pointer${isActiveFocus(opts.filterDim, fVal) ? ';background:var(--navy-tint);border-radius:6px' : ''}"`
+                        : '';
+                    return `<div class="an-row" ${clickable}><span class="an-row-label" style="width:${lw}px" title="${esc(r.label)}">${esc(r.label)}</span><span class="an-track">${fills}</span><span class="an-row-val">${total}</span></div>`;
                 }).join('');
                 return legend + body;
             };
@@ -4105,8 +4181,14 @@
             // Lista simples (top-N) — usada para "eventos mais custosos" e "menos escalados"
             const rankList = (items, opts = {}) => {
                 if (!items.length) return `<div class="an-empty">Sem dados para o filtro selecionado.</div>`;
-                return `<div style="display:flex;flex-direction:column;gap:8px">${items.map((i, idx) => `
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px">
+                return `<div style="display:flex;flex-direction:column;gap:8px">${items.map((i, idx) => {
+                    const fVal = opts.filterDim ? (i.focusVal != null ? i.focusVal : i.label) : null;
+                    const active = opts.filterDim && isActiveFocus(opts.filterDim, fVal);
+                    const clickable = opts.filterDim
+                        ? `data-focus-dim="${esc(opts.filterDim)}" data-focus-val="${esc(fVal)}" data-focus-label="${esc(i.label)}" style="cursor:pointer${active ? ';border-color:var(--navy);background:var(--navy-tint)' : ''}"`
+                        : '';
+                    return `
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px" ${clickable}>
                         <div style="display:flex;align-items:center;gap:10px;min-width:0">
                             <span style="width:22px;height:22px;flex-shrink:0;border-radius:50%;background:${idx===0?'var(--navy)':'var(--bg-alt)'};color:${idx===0?'#fff':'var(--ink-2)'};display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;font-family:'JetBrains Mono',monospace">${idx+1}</span>
                             <div style="min-width:0">
@@ -4115,16 +4197,20 @@
                             </div>
                         </div>
                         <span style="font-size:12.5px;font-weight:700;color:var(--ink);font-family:'JetBrains Mono',monospace">${opts.fmt ? opts.fmt(i.value) : i.value}</span>
-                    </div>`).join('')}</div>`;
+                    </div>`;
+                }).join('')}</div>`;
             };
 
-            const donutChart = (segments, centerLabel) => {
+            const donutChart = (segments, centerLabel, opts = {}) => {
                 const total = segments.reduce((a, s) => a + s.value, 0);
                 if (!total) return `<div class="an-empty">Sem dados para o filtro selecionado.</div>`;
                 const r = 52, c = 2 * Math.PI * r; let off = 0;
                 const arcs = segments.map(s => {
                     const frac = s.value / total;
-                    const el = `<circle cx="70" cy="70" r="${r}" fill="none" stroke="${s.color}" stroke-width="20" stroke-dasharray="${frac * c} ${c}" stroke-dashoffset="${-off * c}" transform="rotate(-90 70 70)"></circle>`;
+                    const clickable = opts.filterDim && s.focusVal != null
+                        ? `data-focus-dim="${esc(opts.filterDim)}" data-focus-val="${esc(s.focusVal)}" data-focus-label="${esc(s.label)}" style="cursor:pointer${isActiveFocus(opts.filterDim, s.focusVal) ? ';opacity:.5' : ''}"`
+                        : '';
+                    const el = `<circle cx="70" cy="70" r="${r}" fill="none" stroke="${s.color}" stroke-width="20" stroke-dasharray="${frac * c} ${c}" stroke-dashoffset="${-off * c}" transform="rotate(-90 70 70)" ${clickable}></circle>`;
                     off += frac; return el;
                 }).join('');
                 return `<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
@@ -4135,10 +4221,15 @@
                         <text x="70" y="84" text-anchor="middle" style="font-size:10px;fill:var(--apple-3rd)">${centerLabel || 'eventos'}</text>
                     </svg>
                     <div style="flex:1;min-width:130px">
-                        ${segments.map(s => `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
-                            <span style="font-size:12px;color:var(--apple-text)"><span class="an-legend-dot" style="background:${s.color}"></span>${esc(s.label)}</span>
-                            <span style="font-size:12px;font-weight:700;color:var(--apple-text)">${s.value} <span style="color:var(--apple-3rd);font-weight:500">(${Math.round(s.value / total * 100)}%)</span></span>
-                        </div>`).join('')}
+                        ${segments.map(s => {
+                            const clickable = opts.filterDim && s.focusVal != null
+                                ? `data-focus-dim="${esc(opts.filterDim)}" data-focus-val="${esc(s.focusVal)}" data-focus-label="${esc(s.label)}" style="cursor:pointer;padding:4px 6px;border-radius:6px${isActiveFocus(opts.filterDim, s.focusVal) ? ';background:var(--navy-tint)' : ''}"`
+                                : 'style="padding:4px 6px"';
+                            return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px" ${clickable}>
+                                <span style="font-size:12px;color:var(--apple-text)"><span class="an-legend-dot" style="background:${s.color}"></span>${esc(s.label)}</span>
+                                <span style="font-size:12px;font-weight:700;color:var(--apple-text)">${s.value} <span style="color:var(--apple-3rd);font-weight:500">(${Math.round(s.value / total * 100)}%)</span></span>
+                            </div>`;
+                        }).join('')}
                     </div>
                 </div>`;
             };
@@ -4146,12 +4237,18 @@
             const vbarChart = (items, opts = {}) => {
                 if (!items.length) return `<div class="an-empty">Sem dados para o filtro selecionado.</div>`;
                 const max = Math.max(...items.map(i => i.value), 1);
-                const H = 130; // altura máxima da barra em px (robusto vs. % de flex)
+                const H = 130;
                 return `<div style="display:flex;align-items:flex-end;gap:4px;height:${H + 22}px">
-                    ${items.map(i => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:0" title="${esc(i.label)}: ${i.value}">
-                        <span style="font-size:10px;font-weight:700;color:var(--apple-2nd);margin-bottom:4px">${i.value || ''}</span>
-                        <div style="width:100%;max-width:34px;height:${Math.round(i.value / max * H)}px;min-height:${i.value > 0 ? 3 : 0}px;background:${opts.color || 'var(--apple-blue)'};border-radius:4px 4px 0 0"></div>
-                    </div>`).join('')}
+                    ${items.map((i, idx) => {
+                        const fVal = opts.filterDim ? (opts.valueMap ? opts.valueMap(i, idx) : i.label) : null;
+                        const clickable = opts.filterDim
+                            ? `data-focus-dim="${esc(opts.filterDim)}" data-focus-val="${esc(fVal)}" data-focus-label="${esc(i.label)}" style="cursor:pointer${isActiveFocus(opts.filterDim, fVal) ? ';opacity:.55' : ''}"`
+                            : '';
+                        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:0" title="${esc(i.label)}: ${i.value}" ${clickable}>
+                            <span style="font-size:10px;font-weight:700;color:var(--apple-2nd);margin-bottom:4px">${i.value || ''}</span>
+                            <div style="width:100%;max-width:34px;height:${Math.round(i.value / max * H)}px;min-height:${i.value > 0 ? 3 : 0}px;background:${opts.color || 'var(--apple-blue)'};border-radius:4px 4px 0 0"></div>
+                        </div>`;
+                    }).join('')}
                 </div>
                 <div style="display:flex;gap:4px;margin-top:6px">
                     ${items.map(i => `<span class="an-bar-x" style="flex:1;text-align:center">${esc(i.short != null ? i.short : i.label)}</span>`).join('')}
@@ -4211,7 +4308,7 @@
 
                 const sourceSet = state.source === 'ativo' ? activeTagged
                     : state.source === 'arquivado' ? archivedTagged : allData;
-                const data = sourceSet.filter(inPeriod);
+                const data = applyFocuses(sourceSet.filter(inPeriod));
 
                 const etOf = (r) => (r.eventType === 'outros' ? 'outros' : 'jogo');
 
@@ -4468,7 +4565,6 @@
                 }) : [];
                 // Consolidação por evento: normaliza case e espaços para agregar
                 // "BOTAFOGO RUN" == "Botafogo Run" == "botafogo   run".
-                const normalizeName = (s) => String(s || '').trim().toUpperCase().replace(/\s+/g, ' ');
                 const eventAgg = {};
                 data.forEach(r => {
                     if (!r.eventName) return;
@@ -4494,7 +4590,7 @@
                     .sort((a, b) => b.count - a.count)
                     .slice(0, 6)
                     .map(a => ({
-                        label: a.canonical,
+                        label: a.canonical, focusVal: a.key,
                         sub: `${a.count} lançamento(s) · ${a.employees.size} profissional(is) · ${a.sectors.size} setor(es)`,
                         value: a.count
                     }));
@@ -4506,7 +4602,7 @@
                         .sort((a, b) => b.value - a.value)
                         .slice(0, 6)
                         .map(a => ({
-                            label: a.canonical,
+                            label: a.canonical, focusVal: a.key,
                             sub: `${a.count} lançamento(s) · ${a.employees.size} profissional(is) · ${a.sectors.size} setor(es)`,
                             value: a.value
                         }))
@@ -4529,6 +4625,21 @@
                     ? `${activeTagged.length} ativos + ${archivedTagged.length} arquivados`
                     : state.source === 'ativo' ? `${activeTagged.length} ativos` : `${archivedTagged.length} arquivados`;
 
+                const focusChips = state.focuses.length ? `
+                    <div class="an-card" style="padding:14px 16px;background:linear-gradient(135deg, var(--navy-tint) 0%, var(--gold-tint) 100%);border-color:rgba(15,37,71,.2)">
+                        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+                            <span class="eyebrow" style="color:var(--navy-deep)">Filtros ativos</span>
+                            ${state.focuses.map(f => `
+                                <button data-remove-focus="${esc(f.dim + '::' + f.val)}" style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 12px;background:var(--navy);color:#fff;border:1px solid var(--navy);border-radius:999px;font-size:11.5px;font-weight:600;cursor:pointer">
+                                    <span style="opacity:.75">${esc(DIM_LABELS[f.dim] || f.dim)}:</span>
+                                    <strong>${esc(f.label)}</strong>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="opacity:.85"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                </button>
+                            `).join('')}
+                            <button id="an-clear-focuses" class="btn-secondary" style="font-size:11px;padding:5px 10px;margin-left:auto">Limpar todos</button>
+                        </div>
+                    </div>` : '';
+
                 return `
                     <div class="space-y-5">
                         <div class="an-card" style="padding:16px 18px">
@@ -4536,8 +4647,9 @@
                                 ${chipGroup('Período', 'period', [{ v: 'all', l: 'Todos' }, { v: 'year', l: 'Ano atual' }, { v: 'last12', l: 'Últimos 12 meses' }, { v: 'month', l: 'Mês atual' }])}
                                 ${chipGroup('Fonte', 'source', [{ v: 'all', l: 'Ativos + Arquivados' }, { v: 'ativo', l: 'Ativos' }, { v: 'arquivado', l: 'Arquivados' }])}
                             </div>
-                            <p style="font-size:11px;color:var(--apple-3rd);margin-top:12px">Analisando <strong style="color:var(--apple-2nd)">${total}</strong> registro(s) — fonte: ${srcNote}.${archiveError ? ' <span style="color:#d97706">Não foi possível carregar os arquivados.</span>' : ''}</p>
+                            <p style="font-size:11px;color:var(--apple-3rd);margin-top:12px">Analisando <strong style="color:var(--apple-2nd)">${total}</strong> registro(s) — fonte: ${srcNote}.${archiveError ? ' <span style="color:#d97706">Não foi possível carregar os arquivados.</span>' : ''}${state.focuses.length ? ` <span style="color:var(--navy);font-weight:600">· ${state.focuses.length} filtro(s) ativo(s)</span>` : ''}</p>
                         </div>
+                        ${focusChips}
 
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                             ${kpi(total, 'Eventos', busiest ? `Pico: ${busiest.short} (${busiest.value})` : '')}
@@ -4556,46 +4668,46 @@
 
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
                             ${card('Eventos por tipo', 'Jogo vs. outros eventos', donutChart([
-                                { label: 'Jogo', value: jogos, color: TYPE_COLORS.jogo },
-                                { label: 'Outros', value: outros, color: TYPE_COLORS.outros },
-                            ]))}
-                            ${card('Classificação de QM', 'Distribuição por grau (A / B / C / D)', hbarChart(qmCounts) + (showValues ? `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--apple-sep);display:flex;gap:16px;flex-wrap:wrap">${qmValueByClass.map(x => `<span style="font-size:11px;color:var(--apple-2nd)"><span class="an-legend-dot" style="background:${QM_COLORS[x.c]}"></span>${x.c}: <strong style="color:var(--apple-text)">${brl(x.v)}</strong></span>`).join('')}</div>` : ''))}
+                                { label: 'Jogo', value: jogos, color: TYPE_COLORS.jogo, focusVal: 'jogo' },
+                                { label: 'Outros', value: outros, color: TYPE_COLORS.outros, focusVal: 'outros' },
+                            ], 'eventos', { filterDim: 'eventType' }))}
+                            ${card('Classificação de QM', 'Distribuição por grau (A / B / C / D)', hbarChart(qmCounts, { filterDim: 'qmClassification' }) + (showValues ? `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--apple-sep);display:flex;gap:16px;flex-wrap:wrap">${qmValueByClass.map(x => `<span style="font-size:11px;color:var(--apple-2nd)"><span class="an-legend-dot" style="background:${QM_COLORS[x.c]}"></span>${x.c}: <strong style="color:var(--apple-text)">${brl(x.v)}</strong></span>`).join('')}</div>` : ''))}
                         </div>
 
-                        ${card('Eventos por mês', 'Volume de registros nos últimos meses', vbarChart(timeline, { color: 'var(--apple-blue)' }))}
+                        ${card('Eventos por mês', 'Volume de registros nos últimos meses', vbarChart(timeline, { color: 'var(--apple-blue)', filterDim: 'month' }))}
 
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                            ${card('Eventos por setor', 'Setores com maior volume (top 12)', hbarChart(bySector, { labelWidth: 200 }))}
-                            ${card('Setores × tipo de evento', 'Quais setores mais fazem cada tipo (top 10)', stackedChart(sectorType, [{ key: 'jogo', label: 'Jogo', color: TYPE_COLORS.jogo }, { key: 'outros', label: 'Outros', color: TYPE_COLORS.outros }], { labelWidth: 200 }))}
+                            ${card('Eventos por setor', 'Setores com maior volume (top 12)', hbarChart(bySector, { labelWidth: 200, filterDim: 'sector' }))}
+                            ${card('Setores × tipo de evento', 'Quais setores mais fazem cada tipo (top 10)', stackedChart(sectorType, [{ key: 'jogo', label: 'Jogo', color: TYPE_COLORS.jogo }, { key: 'outros', label: 'Outros', color: TYPE_COLORS.outros }], { labelWidth: 200, filterDim: 'sector' }))}
                         </div>
 
                         ${showValues ? `
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                            ${card('Profissionais que mais fazem QM', 'Ranking por nº de registros (top 12)', hbarChart(proByCount, { labelWidth: 230 }))}
-                            ${card('Profissionais por valor', 'Ranking por valor acumulado de QM (top 10)', hbarChart(proByValue, { fmt: brl, labelWidth: 230 }))}
+                            ${card('Profissionais que mais fazem QM', 'Ranking por nº de registros (top 12) — clique para filtrar', hbarChart(proByCount, { labelWidth: 230, filterDim: 'employeeName' }))}
+                            ${card('Profissionais por valor', 'Ranking por valor acumulado de QM (top 10) — clique para filtrar', hbarChart(proByValue, { fmt: brl, labelWidth: 230, filterDim: 'employeeName' }))}
                         </div>
                         ` : `
-                        ${card('Profissionais que mais fazem QM', 'Ranking por nº de registros (top 12)', hbarChart(proByCount, { labelWidth: 280 }))}
+                        ${card('Profissionais que mais fazem QM', 'Ranking por nº de registros (top 12) — clique para filtrar', hbarChart(proByCount, { labelWidth: 280, filterDim: 'employeeName' }))}
                         `}
 
                         ${card('Mapa de calor — Setor × Classificação de QM', 'Contagem de registros por grau em cada setor (top 12 setores)', heatmap(hmSectors, QM_ORDER, hmVal))}
 
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                            ${card('Categorias de jogo mais frequentes', 'Somente eventos do tipo Jogo (top 12)', hbarChart(byCategory, { labelWidth: 240 }))}
-                            ${card('Lançamentos por gestor', 'Quem mais registrou QM (top 10)', hbarChart(byManager, { labelWidth: 220 }))}
+                            ${card('Categorias de jogo mais frequentes', 'Somente eventos do tipo Jogo (top 12) — clique para filtrar', hbarChart(byCategory, { labelWidth: 240, filterDim: 'gameCategory' }))}
+                            ${card('Lançamentos por gestor', 'Quem mais registrou QM (top 10) — clique para filtrar', hbarChart(byManager, { labelWidth: 220, filterDim: 'managerName' }))}
                         </div>
 
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                            ${card('Distribuição por dia da semana', 'Concentração de eventos ao longo da semana', vbarChart(weekday, { color: '#1a3560' }))}
-                            ${card('Distribuição por faixa horária', 'Quando acontecem os eventos', vbarChart(byTimeBucket, { color: '#0f2547' }))}
+                            ${card('Distribuição por dia da semana', 'Concentração de eventos ao longo da semana — clique para filtrar', vbarChart(weekday.map((w, i) => ({ ...w, _idx: i })), { color: '#1a3560', filterDim: 'weekday', valueMap: (i, idx) => idx }))}
+                            ${card('Distribuição por faixa horária', 'Quando acontecem os eventos — clique para filtrar', vbarChart(byTimeBucket, { color: '#0f2547', filterDim: 'timeBucket' }))}
                         </div>
 
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                            ${card('Fim de semana vs. dias úteis', 'Peso do calendário na operação', donutChart([
-                                { label: 'Fim de semana', value: fdsCount, color: '#a17635' },
-                                { label: 'Dias úteis', value: dutCount, color: '#0f2547' },
-                            ], 'eventos'))}
-                            ${card('Diversidade — profissionais únicos por setor', 'Quantos profissionais distintos foram escalados (top 12)', hbarChart(diversityBySector, { labelWidth: 200 }))}
+                            ${card('Fim de semana vs. dias úteis', 'Peso do calendário na operação — clique para filtrar', donutChart([
+                                { label: 'Fim de semana', value: fdsCount, color: '#a17635', focusVal: 'fds' },
+                                { label: 'Dias úteis', value: dutCount, color: '#0f2547', focusVal: 'dut' },
+                            ], 'eventos', { filterDim: 'dayType' }))}
+                            ${card('Diversidade — profissionais únicos por setor', 'Quantos profissionais distintos foram escalados (top 12)', hbarChart(diversityBySector, { labelWidth: 200, filterDim: 'sector' }))}
                         </div>
 
                         ${card('Mapa de calor — Dia da semana × Faixa horária', 'Onde a operação concentra ao longo da semana', heatmapGeneric(WD_SHORT.map((w, i) => ({ k: i, label: w })).map(x => x.label), TIME_BUCKETS, (rw, tb) => {
@@ -4605,19 +4717,19 @@
 
                         ${topCatKeys.length ? card('Mapa de calor — Categoria × Setor', 'Cruzamento entre categorias de jogo e setores (top setores × top categorias)', heatmapGeneric(topSectorForCat, topCatKeys, catBySectorVal, { rowLabel: 'Setor', color: '#1a3560' })) : ''}
 
-                        ${topEventsByCount.length ? card('Eventos com mais lançamentos', 'Ranking consolidado por nome — grafias diferentes ("Botafogo Run" e "BOTAFOGO RUN") são unificadas (top 6)', rankList(topEventsByCount)) : ''}
+                        ${topEventsByCount.length ? card('Eventos com mais lançamentos', 'Ranking consolidado por nome — clique para filtrar (top 6)', rankList(topEventsByCount, { filterDim: 'eventKey' })) : ''}
 
                         ${qmComplianceCard}
 
                         ${showValues ? `
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                                ${card('Valor por setor', 'Setores por valor acumulado de QM (top 12)', hbarChart(valueBySector, { fmt: brl, labelWidth: 200 }))}
-                                ${card('Valor por categoria de jogo', 'Categorias por valor acumulado (top 12)', hbarChart(valueByCategory, { fmt: brl, labelWidth: 240 }))}
+                                ${card('Valor por setor', 'Setores por valor acumulado de QM (top 12) — clique para filtrar', hbarChart(valueBySector, { fmt: brl, labelWidth: 200, filterDim: 'sector' }))}
+                                ${card('Valor por categoria de jogo', 'Categorias por valor acumulado (top 12) — clique para filtrar', hbarChart(valueByCategory, { fmt: brl, labelWidth: 240, filterDim: 'gameCategory' }))}
                             </div>
 
-                            ${card('Evolução mensal de valor de QM', 'Somatório de valor por mês', vbarChart(valueByMonth.map(m => ({ ...m, valueRaw: m.value })), { color: '#a17635' }) + `<p style="font-size:11px;color:var(--ink-3);margin-top:10px">Valores em R$ (mensal). Total do período: <strong style="color:var(--ink)">${brl(valueByMonth.reduce((a,m)=>a+m.value,0))}</strong></p>`)}
+                            ${card('Evolução mensal de valor de QM', 'Somatório de valor por mês — clique para filtrar', vbarChart(valueByMonth, { color: '#a17635', filterDim: 'month' }) + `<p style="font-size:11px;color:var(--ink-3);margin-top:10px">Valores em R$ (mensal). Total do período: <strong style="color:var(--ink)">${brl(valueByMonth.reduce((a,m)=>a+m.value,0))}</strong></p>`)}
 
-                            ${topExpensiveEvents.length ? card('Eventos mais custosos', 'Ranking consolidado por nome (case-insensitive) — valor total acumulado por evento (top 6)', rankList(topExpensiveEvents, { fmt: brl })) : ''}
+                            ${topExpensiveEvents.length ? card('Eventos mais custosos', 'Ranking consolidado por nome — valor total por evento (top 6) — clique para filtrar', rankList(topExpensiveEvents, { fmt: brl, filterDim: 'eventKey' })) : ''}
                         ` : ''}
                     </div>
                 `;
@@ -4631,6 +4743,25 @@
                     state[ch.dataset.key] = ch.dataset.val;
                     rerender();
                 });
+                // Cross-filter — clique em qualquer elemento com data-focus-dim
+                el.addEventListener('click', (ev) => {
+                    const t = ev.target.closest('[data-focus-dim]');
+                    if (t) {
+                        toggleFocus(t.dataset.focusDim, t.dataset.focusVal, t.dataset.focusLabel);
+                        return;
+                    }
+                    const remove = ev.target.closest('[data-remove-focus]');
+                    if (remove) {
+                        const [dim, val] = remove.dataset.removeFocus.split('::');
+                        toggleFocus(dim, val);
+                        return;
+                    }
+                    if (ev.target.closest('#an-clear-focuses')) {
+                        state.focuses = [];
+                        rerender();
+                        return;
+                    }
+                }, { once: true }); // será re-attached em cada rerender
             };
 
             rerender();
