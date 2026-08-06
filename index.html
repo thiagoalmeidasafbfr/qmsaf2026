@@ -4359,14 +4359,49 @@
                     const v = data.filter(r => r.eventDate && r.eventDate.slice(0, 7) === k).reduce((a, r) => a + (Number(r.qmValue) || 0), 0);
                     return { label: k, short: `${MONTHS_SHORT[Number(m) - 1]}/${y.slice(2)}`, value: v };
                 }) : [];
+                // Consolidação por evento: normaliza case e espaços para agregar
+                // "BOTAFOGO RUN" == "Botafogo Run" == "botafogo   run".
+                const normalizeName = (s) => String(s || '').trim().toUpperCase().replace(/\s+/g, ' ');
+                const eventAgg = {};
+                data.forEach(r => {
+                    if (!r.eventName) return;
+                    const key = normalizeName(r.eventName);
+                    if (!key) return;
+                    if (!eventAgg[key]) {
+                        eventAgg[key] = { key, canonical: r.eventName, casings: {}, count: 0, value: 0, dates: new Set(), sectors: new Set(), employees: new Set() };
+                    }
+                    const a = eventAgg[key];
+                    a.casings[r.eventName] = (a.casings[r.eventName] || 0) + 1;
+                    // canonical = a grafia mais frequente até agora
+                    if (a.casings[r.eventName] > (a.casings[a.canonical] || 0)) a.canonical = r.eventName;
+                    a.count += 1;
+                    a.value += Number(r.qmValue) || 0;
+                    if (r.eventDate) a.dates.add(r.eventDate);
+                    if (r.sector) a.sectors.add(r.sector);
+                    if (r.employeeName) a.employees.add(r.employeeName.toLowerCase());
+                });
+                const eventAggList = Object.values(eventAgg);
+
+                // Top eventos por nº de lançamentos (para todos)
+                const topEventsByCount = [...eventAggList]
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 6)
+                    .map(a => ({
+                        label: a.canonical,
+                        sub: `${a.count} lançamento(s) · ${a.employees.size} profissional(is) · ${a.sectors.size} setor(es)`,
+                        value: a.count
+                    }));
+
+                // Top eventos por valor acumulado (só admin)
                 const topExpensiveEvents = showValues
-                    ? [...data].filter(r => Number(r.qmValue) > 0)
-                        .sort((a, b) => (Number(b.qmValue) || 0) - (Number(a.qmValue) || 0))
-                        .slice(0, 5)
-                        .map(r => ({
-                            label: r.eventName || 'N/A',
-                            sub: `${r.eventDate ? new Date(r.eventDate + 'T00:00:00').toLocaleDateString('pt-BR') : '—'} · ${r.employeeName || '—'} · ${r.sector || '—'}`,
-                            value: Number(r.qmValue) || 0
+                    ? [...eventAggList]
+                        .filter(a => a.value > 0)
+                        .sort((a, b) => b.value - a.value)
+                        .slice(0, 6)
+                        .map(a => ({
+                            label: a.canonical,
+                            sub: `${a.count} lançamento(s) · ${a.employees.size} profissional(is) · ${a.sectors.size} setor(es)`,
+                            value: a.value
                         }))
                     : [];
 
@@ -4463,6 +4498,8 @@
 
                         ${topCatKeys.length ? card('Mapa de calor — Categoria × Setor', 'Cruzamento entre categorias de jogo e setores (top setores × top categorias)', heatmapGeneric(topSectorForCat, topCatKeys, catBySectorVal, { rowLabel: 'Setor', color: '#1a3560' })) : ''}
 
+                        ${topEventsByCount.length ? card('Eventos com mais lançamentos', 'Ranking consolidado por nome — grafias diferentes ("Botafogo Run" e "BOTAFOGO RUN") são unificadas (top 6)', rankList(topEventsByCount)) : ''}
+
                         ${bottomPros.length >= 3 ? card('Profissionais menos escalados', 'Quem apareceu menos vezes no período (bottom 6)', rankList(bottomPros.map(p => ({ label: p.label, sub: `${p.value} lançamento(s)`, value: p.value })))) : ''}
 
                         ${showValues ? `
@@ -4473,7 +4510,7 @@
 
                             ${card('Evolução mensal de valor de QM', 'Somatório de valor por mês', vbarChart(valueByMonth.map(m => ({ ...m, valueRaw: m.value })), { color: '#a17635' }) + `<p style="font-size:11px;color:var(--ink-3);margin-top:10px">Valores em R$ (mensal). Total do período: <strong style="color:var(--ink)">${brl(valueByMonth.reduce((a,m)=>a+m.value,0))}</strong></p>`)}
 
-                            ${topExpensiveEvents.length ? card('Eventos mais custosos', 'Top 5 registros de maior valor individual', rankList(topExpensiveEvents, { fmt: brl })) : ''}
+                            ${topExpensiveEvents.length ? card('Eventos mais custosos', 'Ranking consolidado por nome (case-insensitive) — valor total acumulado por evento (top 6)', rankList(topExpensiveEvents, { fmt: brl })) : ''}
                         ` : ''}
                     </div>
                 `;
