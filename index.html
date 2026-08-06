@@ -4343,9 +4343,116 @@
                     return timeBucketOf(r.gameTime) === tb;
                 }).length;
 
-                // Menos escalados: profissionais com registros na base porém com contagem baixa
-                const proTails = toSorted(countBy(data.filter(r => r.employeeName), r => r.employeeName), Infinity);
-                const bottomPros = proTails.slice(-6).reverse();
+                // ─────────────────────────────────────────────────────────
+                // Conformidade da regra de QM
+                //  Regra oficial:
+                //    Fim de semana  OU  horário >= 21h  →  esperado A/B
+                //    Dia útil + horário < 21h           →  esperado C/D
+                //  Anomalia = QM registrado FORA do esperado para o contexto.
+                // ─────────────────────────────────────────────────────────
+                const complianceBuckets = ['Madrugada', 'Manhã', 'Tarde', 'Noite', 'Prime 21+'];
+                const complianceRows = [];
+                let totalAnomalies = 0;
+                let totalWithContext = 0;
+                ['Dia útil', 'Fim de semana'].forEach(dayType => {
+                    const isWeekend = dayType === 'Fim de semana';
+                    complianceBuckets.forEach(bucket => {
+                        const rows = data.filter(r => {
+                            if (!r.eventDate || !r.gameTime) return false;
+                            const d = new Date(r.eventDate + 'T00:00:00');
+                            if (isNaN(d)) return false;
+                            const dow = d.getDay();
+                            const w = (dow === 0 || dow === 6);
+                            if (w !== isWeekend) return false;
+                            return timeBucketOf(r.gameTime) === bucket;
+                        });
+                        const counts = { A: 0, B: 0, C: 0, D: 0 };
+                        rows.forEach(r => { if (counts.hasOwnProperty(r.qmClassification)) counts[r.qmClassification]++; });
+                        const rowTotal = rows.length;
+                        const expectedAB = isWeekend || bucket === 'Prime 21+';
+                        const expected = expectedAB ? ['A', 'B'] : ['C', 'D'];
+                        const anomalyCount = expectedAB ? counts.C + counts.D : counts.A + counts.B;
+                        totalAnomalies += anomalyCount;
+                        totalWithContext += rowTotal;
+                        complianceRows.push({ dayType, bucket, counts, total: rowTotal, expected, anomalyCount, expectedAB, isWeekend });
+                    });
+                });
+                const complianceTableHtml = (() => {
+                    const cell = (v, isAnomaly) => {
+                        if (v === 0) return `<td style="text-align:center;padding:8px 6px;font-size:12px;color:var(--ink-4);font-family:'JetBrains Mono',monospace">·</td>`;
+                        if (isAnomaly) return `<td style="text-align:center;padding:8px 6px"><span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:rgba(127,29,29,.08);border:1px solid rgba(127,29,29,.35);border-radius:6px;color:var(--danger);font-weight:700;font-size:12px;font-family:'JetBrains Mono',monospace"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>${v}</span></td>`;
+                        return `<td style="text-align:center;padding:8px 6px;font-size:12px;font-weight:700;color:var(--ink);font-family:'JetBrains Mono',monospace">${v}</td>`;
+                    };
+                    const sectionRows = (dayType) => {
+                        const rows = complianceRows.filter(r => r.dayType === dayType);
+                        const secAnom = rows.reduce((a, r) => a + r.anomalyCount, 0);
+                        const secTotal = rows.reduce((a, r) => a + r.total, 0);
+                        return `
+                            <tr style="background:var(--surface-2)">
+                                <td colspan="7" style="padding:10px 12px;font-size:10.5px;font-weight:700;color:var(--navy-deep);text-transform:uppercase;letter-spacing:.1em;border-top:2px solid var(--line-strong)">
+                                    ${dayType} · ${secTotal} lançamento(s)${secAnom > 0 ? ` · <span style="color:var(--danger)">${secAnom} anomalia(s)</span>` : ' · <span style="color:var(--success)">conformidade total</span>'}
+                                </td>
+                            </tr>
+                            ${rows.map(r => {
+                                const isAAnomaly = !r.expectedAB && r.counts.A > 0;
+                                const isBAnomaly = !r.expectedAB && r.counts.B > 0;
+                                const isCAnomaly = r.expectedAB && r.counts.C > 0;
+                                const isDAnomaly = r.expectedAB && r.counts.D > 0;
+                                const expectedTxt = r.expected.join('/');
+                                return `<tr>
+                                    <td style="padding:8px 12px;font-size:12.5px;color:var(--ink)">${r.bucket}</td>
+                                    <td style="padding:8px 6px;text-align:center;font-size:10px;color:var(--ink-3);letter-spacing:.06em">${expectedTxt}</td>
+                                    ${cell(r.counts.A, isAAnomaly)}
+                                    ${cell(r.counts.B, isBAnomaly)}
+                                    ${cell(r.counts.C, isCAnomaly)}
+                                    ${cell(r.counts.D, isDAnomaly)}
+                                    <td style="text-align:center;padding:8px 6px;font-size:12px;font-weight:700;color:var(--ink)">${r.total || '—'}</td>
+                                </tr>`;
+                            }).join('')}
+                        `;
+                    };
+                    return `
+                        <div style="overflow-x:auto">
+                            <table style="width:100%;border-collapse:separate;border-spacing:0">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align:left;padding:8px 12px;font-size:10.5px;color:var(--ink-3);font-weight:700;letter-spacing:.08em;text-transform:uppercase">Faixa horária</th>
+                                        <th style="padding:8px 6px;font-size:10px;color:var(--ink-3);font-weight:700;letter-spacing:.06em;text-transform:uppercase;text-align:center">Esperado</th>
+                                        <th style="padding:8px 6px;font-size:11px;font-weight:700;text-align:center;color:${QM_COLORS.A};font-family:'JetBrains Mono',monospace">A</th>
+                                        <th style="padding:8px 6px;font-size:11px;font-weight:700;text-align:center;color:${QM_COLORS.B};font-family:'JetBrains Mono',monospace">B</th>
+                                        <th style="padding:8px 6px;font-size:11px;font-weight:700;text-align:center;color:${QM_COLORS.C};font-family:'JetBrains Mono',monospace">C</th>
+                                        <th style="padding:8px 6px;font-size:11px;font-weight:700;text-align:center;color:${QM_COLORS.D};font-family:'JetBrains Mono',monospace">D</th>
+                                        <th style="padding:8px 6px;font-size:10.5px;color:var(--ink-3);font-weight:700;letter-spacing:.08em;text-transform:uppercase;text-align:center">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${sectionRows('Dia útil')}
+                                    ${sectionRows('Fim de semana')}
+                                </tbody>
+                            </table>
+                        </div>`;
+                })();
+                const compliancePct = totalWithContext ? Math.round((totalWithContext - totalAnomalies) / totalWithContext * 100) : 100;
+                const complianceHeaderHtml = `
+                    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:14px;padding:12px 14px;background:${totalAnomalies>0?'rgba(127,29,29,.05)':'rgba(20,83,45,.05)'};border:1px solid ${totalAnomalies>0?'rgba(127,29,29,.2)':'rgba(20,83,45,.2)'};border-radius:10px">
+                        <div>
+                            <p style="font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.1em;font-weight:700">Conformidade</p>
+                            <p style="font-size:20px;font-weight:700;color:${totalAnomalies>0?'var(--danger)':'var(--success)'};margin-top:2px;font-family:'JetBrains Mono',monospace">${compliancePct}%</p>
+                        </div>
+                        <div style="text-align:right">
+                            <p style="font-size:13px;font-weight:700;color:${totalAnomalies>0?'var(--danger)':'var(--success)'}">${totalAnomalies} anomalia(s)</p>
+                            <p style="font-size:11px;color:var(--ink-3);margin-top:2px">de ${totalWithContext} lançamento(s) com data e horário</p>
+                        </div>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--ink-2);margin-bottom:14px">
+                        <span><strong style="color:var(--ink)">Regra QM:</strong> Fim de semana OU horário ≥ 21h → esperado A/B · Dia útil + horário &lt; 21h → esperado C/D</span>
+                    </div>
+                `;
+                const qmComplianceCard = card(
+                    'Conformidade da Regra de QM',
+                    'Cruzamento Dia útil / Fim de semana × Faixa horária × Classificação. Células com ícone ⚠ indicam registros fora do esperado (ex.: um QM A lançado em dia útil à tarde).',
+                    complianceHeaderHtml + complianceTableHtml
+                );
 
                 // Admin only — valores por setor / categoria / mês
                 const valueBySector = showValues
@@ -4500,7 +4607,7 @@
 
                         ${topEventsByCount.length ? card('Eventos com mais lançamentos', 'Ranking consolidado por nome — grafias diferentes ("Botafogo Run" e "BOTAFOGO RUN") são unificadas (top 6)', rankList(topEventsByCount)) : ''}
 
-                        ${bottomPros.length >= 3 ? card('Profissionais menos escalados', 'Quem apareceu menos vezes no período (bottom 6)', rankList(bottomPros.map(p => ({ label: p.label, sub: `${p.value} lançamento(s)`, value: p.value })))) : ''}
+                        ${qmComplianceCard}
 
                         ${showValues ? `
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
