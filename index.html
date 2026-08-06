@@ -4045,28 +4045,77 @@
             const hbarChart = (items, opts = {}) => {
                 if (!items.length) return `<div class="an-empty">Sem dados para o filtro selecionado.</div>`;
                 const max = Math.max(...items.map(i => i.value), 1);
+                const lw = opts.labelWidth || 132;
                 return items.map(i => {
                     const pct = i.value / max * 100;
                     const val = opts.fmt ? opts.fmt(i.value) : i.value;
                     return `<div class="an-row">
-                        <span class="an-row-label" title="${esc(i.label)}">${esc(i.label)}</span>
+                        <span class="an-row-label" style="width:${lw}px" title="${esc(i.label)}">${esc(i.label)}</span>
                         <span class="an-track"><span class="an-fill" style="width:${pct}%;background:${i.color || 'var(--apple-blue)'}"></span></span>
                         <span class="an-row-val">${val}</span>
                     </div>`;
                 }).join('');
             };
 
-            const stackedChart = (rows, segDefs) => {
+            const stackedChart = (rows, segDefs, opts = {}) => {
                 if (!rows.length) return `<div class="an-empty">Sem dados para o filtro selecionado.</div>`;
                 const max = Math.max(...rows.map(r => segDefs.reduce((a, s) => a + (r[s.key] || 0), 0)), 1);
+                const lw = opts.labelWidth || 132;
                 const legend = `<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">${segDefs.map(s => `<span style="font-size:11px;color:var(--apple-2nd)"><span class="an-legend-dot" style="background:${s.color}"></span>${esc(s.label)}</span>`).join('')}</div>`;
                 const body = rows.map(r => {
                     const total = segDefs.reduce((a, s) => a + (r[s.key] || 0), 0);
                     const fills = segDefs.map(s => (r[s.key] || 0) > 0
                         ? `<span class="an-fill" style="width:${(r[s.key] / max * 100)}%;background:${s.color};border-radius:0" title="${esc(s.label)}: ${r[s.key]}"></span>` : '').join('');
-                    return `<div class="an-row"><span class="an-row-label" title="${esc(r.label)}">${esc(r.label)}</span><span class="an-track">${fills}</span><span class="an-row-val">${total}</span></div>`;
+                    return `<div class="an-row"><span class="an-row-label" style="width:${lw}px" title="${esc(r.label)}">${esc(r.label)}</span><span class="an-track">${fills}</span><span class="an-row-val">${total}</span></div>`;
                 }).join('');
                 return legend + body;
+            };
+
+            // Heatmap genérico (linhas × colunas) — usa uma cor base configurável
+            const heatmapGeneric = (rowKeys, colKeys, getVal, opts = {}) => {
+                let max = 0;
+                rowKeys.forEach(rw => colKeys.forEach(c => { max = Math.max(max, getVal(rw, c)); }));
+                if (max === 0 || !rowKeys.length) return `<div class="an-empty">Sem dados para o filtro selecionado.</div>`;
+                const baseColor = opts.color || '#0f2547';
+                const rr = parseInt(baseColor.slice(1,3),16), gg = parseInt(baseColor.slice(3,5),16), bb = parseInt(baseColor.slice(5,7),16);
+                const alphaColor = (a) => `rgba(${rr},${gg},${bb},${a.toFixed(3)})`;
+                const rowLabel = opts.rowLabel || '';
+                const header = `<tr>
+                    <th style="text-align:left;padding:8px 10px;font-size:10.5px;color:var(--ink-3);font-weight:700;letter-spacing:.08em;text-transform:uppercase">${esc(rowLabel)}</th>
+                    ${colKeys.map(c => `<th style="padding:8px 8px;font-size:10.5px;font-weight:700;text-align:center;color:var(--ink-2);letter-spacing:.04em">${esc(c)}</th>`).join('')}
+                    <th style="padding:8px 8px;font-size:10.5px;color:var(--ink-3);text-align:center;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Total</th>
+                </tr>`;
+                const body = rowKeys.map(rw => {
+                    const rowTotal = colKeys.reduce((a, c) => a + getVal(rw, c), 0);
+                    return `<tr>
+                        <td style="padding:4px 10px;font-size:12px;color:var(--ink);white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis" title="${esc(rw)}">${esc(rw)}</td>
+                        ${colKeys.map(c => {
+                            const v = getVal(rw, c);
+                            const intensity = v / max;
+                            const bg = v === 0 ? 'var(--bg-alt)' : alphaColor(0.12 + intensity * 0.78);
+                            const col = v === 0 ? 'var(--ink-4)' : (intensity > 0.55 ? '#fff' : 'var(--ink)');
+                            return `<td style="padding:3px"><div class="an-hm-cell" style="background:${bg};color:${col}">${v || '·'}</div></td>`;
+                        }).join('')}
+                        <td style="text-align:center;font-size:12px;font-weight:700;color:var(--ink)">${rowTotal}</td>
+                    </tr>`;
+                }).join('');
+                return `<div style="overflow-x:auto"><table style="width:100%;border-collapse:separate;border-spacing:0"><thead>${header}</thead><tbody>${body}</tbody></table></div>`;
+            };
+
+            // Lista simples (top-N) — usada para "eventos mais custosos" e "menos escalados"
+            const rankList = (items, opts = {}) => {
+                if (!items.length) return `<div class="an-empty">Sem dados para o filtro selecionado.</div>`;
+                return `<div style="display:flex;flex-direction:column;gap:8px">${items.map((i, idx) => `
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px">
+                        <div style="display:flex;align-items:center;gap:10px;min-width:0">
+                            <span style="width:22px;height:22px;flex-shrink:0;border-radius:50%;background:${idx===0?'var(--navy)':'var(--bg-alt)'};color:${idx===0?'#fff':'var(--ink-2)'};display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;font-family:'JetBrains Mono',monospace">${idx+1}</span>
+                            <div style="min-width:0">
+                                <p style="font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(i.label)}">${esc(i.label)}</p>
+                                ${i.sub ? `<p style="font-size:11px;color:var(--ink-3);margin-top:1px">${esc(i.sub)}</p>` : ''}
+                            </div>
+                        </div>
+                        <span style="font-size:12.5px;font-weight:700;color:var(--ink);font-family:'JetBrains Mono',monospace">${opts.fmt ? opts.fmt(i.value) : i.value}</span>
+                    </div>`).join('')}</div>`;
             };
 
             const donutChart = (segments, centerLabel) => {
@@ -4235,9 +4284,102 @@
                 data.forEach(r => { if (r.eventDate) { const d = new Date(r.eventDate + 'T00:00:00'); if (!isNaN(d)) wdCounts[d.getDay()]++; } });
                 const weekday = WD_SHORT.map((w, i) => ({ label: w, short: w, value: wdCounts[i] }));
 
+                // Faixa horária do evento
+                const timeBucketOf = (t) => {
+                    if (!t) return null;
+                    const h = parseInt(String(t).split(':')[0], 10);
+                    if (Number.isNaN(h)) return null;
+                    if (h < 6) return 'Madrugada';
+                    if (h < 12) return 'Manhã';
+                    if (h < 18) return 'Tarde';
+                    if (h < 21) return 'Noite';
+                    return 'Prime 21+';
+                };
+                const TIME_BUCKETS = ['Madrugada', 'Manhã', 'Tarde', 'Noite', 'Prime 21+'];
+                const byTimeBucket = TIME_BUCKETS.map(t => ({
+                    label: t, short: t,
+                    value: data.filter(r => timeBucketOf(r.gameTime) === t).length,
+                }));
+
+                // Fim de semana × dias úteis
+                const fdsCount = data.filter(r => {
+                    if (!r.eventDate) return false;
+                    const dow = new Date(r.eventDate + 'T00:00:00').getDay();
+                    return dow === 0 || dow === 6;
+                }).length;
+                const dutCount = data.filter(r => r.eventDate).length - fdsCount;
+                const fdsPct = total ? Math.round(fdsCount / total * 100) : 0;
+
+                // Concentração — os top 5 profissionais representam quanto do total?
+                const top5Total = proByCount.slice(0, 5).reduce((a, i) => a + i.value, 0);
+                const concentrationPct = total ? Math.round(top5Total / total * 100) : 0;
+
+                // Última atividade (evento mais recente)
+                const latestDate = data.reduce((mx, r) => (r.eventDate && r.eventDate > mx) ? r.eventDate : mx, '');
+                const daysSince = latestDate
+                    ? Math.max(0, Math.round((Date.now() - new Date(latestDate + 'T00:00:00').getTime()) / 86400000))
+                    : null;
+
+                // Diversidade — nº de profissionais únicos por setor
+                const diversityBySector = sectorNames.map(s => ({
+                    label: s,
+                    value: new Set(data.filter(r => r.sector === s && r.employeeName).map(r => r.employeeName.toLowerCase())).size,
+                    color: '#1a3560'
+                })).sort((a, b) => b.value - a.value).slice(0, 12);
+
+                // Heatmap Categoria × Setor (só jogos)
+                const topCatKeys = toSorted(countBy(data.filter(r => etOf(r) === 'jogo'), r => r.gameCategory), 6).map(c => c.label);
+                const topSectorForCat = sectorNames
+                    .map(s => ({ s, t: data.filter(r => r.sector === s && etOf(r) === 'jogo').length }))
+                    .filter(x => x.t > 0)
+                    .sort((a, b) => b.t - a.t).slice(0, 10).map(x => x.s);
+                const catBySectorVal = (s, c) => data.filter(r => r.sector === s && r.gameCategory === c).length;
+
+                // Heatmap Dia da semana × Faixa horária
+                const hmDayTimeVal = (dowIdx, tb) => data.filter(r => {
+                    if (!r.eventDate || !r.gameTime) return false;
+                    const d = new Date(r.eventDate + 'T00:00:00');
+                    if (isNaN(d) || d.getDay() !== dowIdx) return false;
+                    return timeBucketOf(r.gameTime) === tb;
+                }).length;
+
+                // Menos escalados: profissionais com registros na base porém com contagem baixa
+                const proTails = toSorted(countBy(data.filter(r => r.employeeName), r => r.employeeName), Infinity);
+                const bottomPros = proTails.slice(-6).reverse();
+
+                // Admin only — valores por setor / categoria / mês
+                const valueBySector = showValues
+                    ? toSorted(sumBy(data, r => r.sector, r => Number(r.qmValue) || 0), 12).map(i => ({ ...i, color: '#0f2547' }))
+                    : [];
+                const valueByCategory = showValues
+                    ? toSorted(sumBy(data.filter(r => etOf(r) === 'jogo'), r => r.gameCategory, r => Number(r.qmValue) || 0), 12).map(i => ({ ...i, color: '#1a3560' }))
+                    : [];
+                const valueByMonth = showValues ? monthKeys.map(k => {
+                    const [y, m] = k.split('-');
+                    const v = data.filter(r => r.eventDate && r.eventDate.slice(0, 7) === k).reduce((a, r) => a + (Number(r.qmValue) || 0), 0);
+                    return { label: k, short: `${MONTHS_SHORT[Number(m) - 1]}/${y.slice(2)}`, value: v };
+                }) : [];
+                const topExpensiveEvents = showValues
+                    ? [...data].filter(r => Number(r.qmValue) > 0)
+                        .sort((a, b) => (Number(b.qmValue) || 0) - (Number(a.qmValue) || 0))
+                        .slice(0, 5)
+                        .map(r => ({
+                            label: r.eventName || 'N/A',
+                            sub: `${r.eventDate ? new Date(r.eventDate + 'T00:00:00').toLocaleDateString('pt-BR') : '—'} · ${r.employeeName || '—'} · ${r.sector || '—'}`,
+                            value: Number(r.qmValue) || 0
+                        }))
+                    : [];
+
                 const busiest = timeline.length ? [...timeline].sort((a, b) => b.value - a.value)[0] : null;
                 const topSector = bySector[0];
                 const topPro = proByCount[0];
+                const topTimeBucket = [...byTimeBucket].sort((a, b) => b.value - a.value)[0];
+                const brlAbbrev = (n) => {
+                    n = Number(n || 0);
+                    if (n >= 1e6) return 'R$ ' + (n / 1e6).toFixed(1).replace('.', ',') + 'M';
+                    if (n >= 1e3) return 'R$ ' + Math.round(n / 1e3) + 'k';
+                    return 'R$ ' + n;
+                };
 
                 const kpi = (num, label, sub) => `<div class="an-kpi"><p class="an-kpi-num">${num}</p><p class="an-kpi-label">${label}</p>${sub ? `<p class="an-kpi-sub">${sub}</p>` : ''}</div>`;
 
@@ -4264,6 +4406,10 @@
                             ${kpi(sectorsUsed, 'Setores ativos', topSector ? `Top: ${esc(topSector.label)}` : '')}
                             ${kpi(catsUsed, 'Categorias de jogo')}
                             ${kpi(qmCounts.find(q => q.label === 'A')?.value || 0, 'QMs Grau A', total ? `${Math.round((qmCounts.find(q => q.label === 'A')?.value || 0) / total * 100)}% dos QMs` : '')}
+                            ${kpi(fdsPct + '%', 'Fim de semana', `${fdsCount} de ${fdsCount + dutCount} eventos`)}
+                            ${kpi(concentrationPct + '%', 'Concentração top 5', total ? `${top5Total} de ${total} lançamentos` : '')}
+                            ${kpi(topTimeBucket?.value || 0, 'Pico horário', topTimeBucket ? esc(topTimeBucket.label) : '—')}
+                            ${daysSince != null ? kpi(daysSince, 'Dias desde o último', latestDate ? `Em ${new Date(latestDate + 'T00:00:00').toLocaleDateString('pt-BR')}` : '') : ''}
                         </div>
 
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -4277,27 +4423,58 @@
                         ${card('Eventos por mês', 'Volume de registros nos últimos meses', vbarChart(timeline, { color: 'var(--apple-blue)' }))}
 
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                            ${card('Eventos por setor', 'Setores com maior volume (top 12)', hbarChart(bySector))}
-                            ${card('Setores × tipo de evento', 'Quais setores mais fazem cada tipo (top 10)', stackedChart(sectorType, [{ key: 'jogo', label: 'Jogo', color: TYPE_COLORS.jogo }, { key: 'outros', label: 'Outros', color: TYPE_COLORS.outros }]))}
+                            ${card('Eventos por setor', 'Setores com maior volume (top 12)', hbarChart(bySector, { labelWidth: 200 }))}
+                            ${card('Setores × tipo de evento', 'Quais setores mais fazem cada tipo (top 10)', stackedChart(sectorType, [{ key: 'jogo', label: 'Jogo', color: TYPE_COLORS.jogo }, { key: 'outros', label: 'Outros', color: TYPE_COLORS.outros }], { labelWidth: 200 }))}
                         </div>
 
                         ${showValues ? `
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                            ${card('Profissionais que mais fazem QM', 'Ranking por nº de registros (top 12)', hbarChart(proByCount))}
-                            ${card('Profissionais por valor', 'Ranking por valor acumulado de QM (top 10)', hbarChart(proByValue, { fmt: brl }))}
+                            ${card('Profissionais que mais fazem QM', 'Ranking por nº de registros (top 12)', hbarChart(proByCount, { labelWidth: 230 }))}
+                            ${card('Profissionais por valor', 'Ranking por valor acumulado de QM (top 10)', hbarChart(proByValue, { fmt: brl, labelWidth: 230 }))}
                         </div>
                         ` : `
-                        ${card('Profissionais que mais fazem QM', 'Ranking por nº de registros (top 12)', hbarChart(proByCount))}
+                        ${card('Profissionais que mais fazem QM', 'Ranking por nº de registros (top 12)', hbarChart(proByCount, { labelWidth: 280 }))}
                         `}
 
                         ${card('Mapa de calor — Setor × Classificação de QM', 'Contagem de registros por grau em cada setor (top 12 setores)', heatmap(hmSectors, QM_ORDER, hmVal))}
 
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                            ${card('Categorias de jogo mais frequentes', 'Somente eventos do tipo Jogo (top 12)', hbarChart(byCategory))}
-                            ${card('Lançamentos por gestor', 'Quem mais registrou QM (top 10)', hbarChart(byManager))}
+                            ${card('Categorias de jogo mais frequentes', 'Somente eventos do tipo Jogo (top 12)', hbarChart(byCategory, { labelWidth: 240 }))}
+                            ${card('Lançamentos por gestor', 'Quem mais registrou QM (top 10)', hbarChart(byManager, { labelWidth: 220 }))}
                         </div>
 
-                        ${card('Distribuição por dia da semana', 'Concentração de eventos ao longo da semana', vbarChart(weekday, { color: '#6366f1' }))}
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                            ${card('Distribuição por dia da semana', 'Concentração de eventos ao longo da semana', vbarChart(weekday, { color: '#1a3560' }))}
+                            ${card('Distribuição por faixa horária', 'Quando acontecem os eventos', vbarChart(byTimeBucket, { color: '#0f2547' }))}
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                            ${card('Fim de semana vs. dias úteis', 'Peso do calendário na operação', donutChart([
+                                { label: 'Fim de semana', value: fdsCount, color: '#a17635' },
+                                { label: 'Dias úteis', value: dutCount, color: '#0f2547' },
+                            ], 'eventos'))}
+                            ${card('Diversidade — profissionais únicos por setor', 'Quantos profissionais distintos foram escalados (top 12)', hbarChart(diversityBySector, { labelWidth: 200 }))}
+                        </div>
+
+                        ${card('Mapa de calor — Dia da semana × Faixa horária', 'Onde a operação concentra ao longo da semana', heatmapGeneric(WD_SHORT.map((w, i) => ({ k: i, label: w })).map(x => x.label), TIME_BUCKETS, (rw, tb) => {
+                            const idx = WD_SHORT.indexOf(rw);
+                            return hmDayTimeVal(idx, tb);
+                        }, { rowLabel: 'Dia', color: '#0f2547' }))}
+
+                        ${topCatKeys.length ? card('Mapa de calor — Categoria × Setor', 'Cruzamento entre categorias de jogo e setores (top setores × top categorias)', heatmapGeneric(topSectorForCat, topCatKeys, catBySectorVal, { rowLabel: 'Setor', color: '#1a3560' })) : ''}
+
+                        ${bottomPros.length >= 3 ? card('Profissionais menos escalados', 'Quem apareceu menos vezes no período (bottom 6)', rankList(bottomPros.map(p => ({ label: p.label, sub: `${p.value} lançamento(s)`, value: p.value })))) : ''}
+
+                        ${showValues ? `
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                                ${card('Valor por setor', 'Setores por valor acumulado de QM (top 12)', hbarChart(valueBySector, { fmt: brl, labelWidth: 200 }))}
+                                ${card('Valor por categoria de jogo', 'Categorias por valor acumulado (top 12)', hbarChart(valueByCategory, { fmt: brl, labelWidth: 240 }))}
+                            </div>
+
+                            ${card('Evolução mensal de valor de QM', 'Somatório de valor por mês', vbarChart(valueByMonth.map(m => ({ ...m, valueRaw: m.value })), { color: '#a17635' }) + `<p style="font-size:11px;color:var(--ink-3);margin-top:10px">Valores em R$ (mensal). Total do período: <strong style="color:var(--ink)">${brl(valueByMonth.reduce((a,m)=>a+m.value,0))}</strong></p>`)}
+
+                            ${topExpensiveEvents.length ? card('Eventos mais custosos', 'Top 5 registros de maior valor individual', rankList(topExpensiveEvents, { fmt: brl })) : ''}
+                        ` : ''}
                     </div>
                 `;
             };
