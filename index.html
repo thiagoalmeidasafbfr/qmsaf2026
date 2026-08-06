@@ -3275,6 +3275,61 @@
         }
 
         // Arquiva uma seleção específica de registros: move de records → archived_records
+        // Move um registro de archived_records → records (desarquiva sem excluir dado).
+        // Somente admin (verificado por RLS na inserção em records via is_admin()).
+        async function unarchiveRecord(archivedId) {
+            const { data: rows, error: fetchErr } = await supabase
+                .from('archived_records').select('*').eq('id', archivedId).limit(1);
+            if (fetchErr) throw fetchErr;
+            const arch = (rows || [])[0];
+            if (!arch) throw new Error('Registro arquivado não encontrado.');
+
+            const insertRow = {
+                event_name: arch.event_name,
+                event_date: arch.event_date,
+                game_time: arch.game_time,
+                event_type: arch.event_type,
+                game_category: arch.game_category,
+                qm_classification: arch.qm_classification,
+                qm_value: arch.qm_value,
+                employee_id: arch.employee_id,
+                employee_name: arch.employee_name,
+                notes: arch.notes,
+                sector: arch.sector,
+                manager_id: arch.manager_id,
+                manager_name: arch.manager_name,
+                created_at: arch.created_at,
+            };
+            if (arch.original_id) insertRow.id = arch.original_id;
+
+            const { error: insErr } = await supabase.from('records').insert(insertRow);
+            if (insErr) throw insErr;
+
+            const { error: delErr } = await supabase
+                .from('archived_records').delete().eq('id', archivedId).select('id');
+            if (delErr) throw delErr;
+        }
+
+        // Busca TODAS as linhas de uma tabela em páginas de 1000 (limite padrão do PostgREST).
+        // Aceita função para customizar a query (order, filtros extras). Retorna array completo.
+        async function fetchAllPages(table, buildQuery = null) {
+            const pageSize = 1000;
+            let all = [];
+            let from = 0;
+            while (true) {
+                let q = supabase.from(table).select('*');
+                if (buildQuery) q = buildQuery(q);
+                q = q.range(from, from + pageSize - 1);
+                const { data, error } = await q;
+                if (error) throw error;
+                if (!data || data.length === 0) break;
+                all = all.concat(data);
+                if (data.length < pageSize) break;
+                from += pageSize;
+            }
+            return all;
+        }
+
         async function archiveSelectedRecords(idsToArchive) {
             try {
                 if (!Array.isArray(idsToArchive) || idsToArchive.length === 0) {
@@ -3481,9 +3536,8 @@
 
                 const activeRows = (globalData.records || []).map(r => ({ ...r, _status: 'Ativo', _archivedAt: null }));
 
-                const { data: archivedRaw, error } = await supabase
-                    .from('archived_records').select('*').order('archived_at', { ascending: false });
-                if (error) throw error;
+                const archivedRaw = await fetchAllPages('archived_records',
+                    q => q.order('archived_at', { ascending: false }));
 
                 const archivedRows = (archivedRaw || []).map(fromDB).map(r => ({ ...r, _status: 'Arquivado', _archivedAt: r.archivedAt }));
 
@@ -3556,9 +3610,8 @@
             document.getElementById('btn-hg-back').onclick = () => { currentView = backView; renderApp(); };
 
             try {
-                const { data: rawArchived, error } = await supabase
-                    .from('archived_records').select('*').order('archived_at', { ascending: false });
-                if (error) throw error;
+                const rawArchived = await fetchAllPages('archived_records',
+                    q => q.order('archived_at', { ascending: false }));
 
                 const archived = (rawArchived || []).map(fromDB);
 
@@ -3594,10 +3647,15 @@
                             <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${r.sector||'-'}</td>
                             <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${r.managerName||'-'}</td>
                             <td class="text-xs text-slate-500" style="padding:10px 16px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.notes||''}">${r.notes||'—'}</td>
-                            ${canDelete ? `<td class="text-center" style="padding:10px 16px">
-                                <button class="btn-delete-archived text-slate-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors" data-id="${r.id}" title="Excluir registro arquivado">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                                </button>
+                            ${canDelete ? `<td class="whitespace-nowrap" style="padding:10px 16px">
+                                <div class="flex items-center gap-1 justify-center">
+                                    <button class="btn-unarchive text-slate-400 p-1.5 rounded-lg transition-colors" style="color:var(--ink-3)" onmouseover="this.style.color='var(--navy)';this.style.background='var(--navy-soft)'" onmouseout="this.style.color='var(--ink-3)';this.style.background='none'" data-id="${r.id}" data-name="${(r.eventName||'registro').replace(/"/g,'&quot;')}" title="Desarquivar (volta para o histórico ativo)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M5 6l1 14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-14"/><path d="M9 12h6M12 9v6"/><path d="M12 3l3 3-3 3M15 6H3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                    <button class="btn-delete-archived text-slate-400 p-1.5 rounded-lg transition-colors" style="color:var(--ink-3)" onmouseover="this.style.color='var(--danger)';this.style.background='var(--danger-bg)'" onmouseout="this.style.color='var(--ink-3)';this.style.background='none'" data-id="${r.id}" title="Excluir registro arquivado (definitivo)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                    </button>
+                                </div>
                             </td>` : ''}
                         </tr>`).join('');
                     return `<div class="tbl-scroll-wrap border border-slate-100 rounded-xl">
@@ -3609,6 +3667,34 @@
                             </tr></thead>
                             <tbody>${rows}</tbody>
                         </table></div>`;
+                };
+
+                const unarchiveOne = (id, eventName) => {
+                    confirmAction(
+                        'Desarquivar registro',
+                        `Devolver o registro "<strong>${eventName}</strong>" para o histórico ativo? Ele sai do Arquivamento e volta a aparecer nos lançamentos correntes.`,
+                        async () => {
+                            try {
+                                await unarchiveRecord(id);
+                                // Remove localmente
+                                const idx = archived.findIndex(r => r.id === id);
+                                if (idx !== -1) archived.splice(idx, 1);
+                                Object.values(batchMap).forEach(b => {
+                                    const bi = b.records.findIndex(r => r.id === id);
+                                    if (bi !== -1) b.records.splice(bi, 1);
+                                });
+                                Object.keys(batchMap).forEach(k => { if (batchMap[k].records.length === 0) delete batchMap[k]; });
+                                showNotification('Registro devolvido ao histórico ativo.', 'success');
+                                renderContent();
+                                // recarrega a lista ativa em background
+                                loadAllData();
+                            } catch (err) {
+                                const msg = err?.message || JSON.stringify(err);
+                                showNotification(`Erro ao desarquivar: ${msg}`, 'error', 7000);
+                                console.error('[unarchive]', err);
+                            }
+                        }
+                    );
                 };
 
                 const deleteArchivedRecord = async (id, eventName) => {
@@ -3835,14 +3921,17 @@
 
                 renderContent();
 
-                // Bind delete buttons via event delegation (uma única vez no container)
+                // Bind ações via event delegation (uma única vez no container)
                 document.getElementById('hg-table-container').addEventListener('click', (e) => {
-                    const btn = e.target.closest('.btn-delete-archived');
+                    const delBtn = e.target.closest('.btn-delete-archived');
+                    const unBtn = e.target.closest('.btn-unarchive');
+                    const btn = delBtn || unBtn;
                     if (!btn) return;
                     const id = btn.dataset.id;
                     const row = btn.closest('tr[data-archived-id]');
-                    const eventName = row?.querySelector('p.font-semibold')?.textContent || id;
-                    deleteArchivedRecord(id, eventName);
+                    const eventName = row?.querySelector('p.font-semibold')?.textContent || btn.dataset.name || id;
+                    if (unBtn) unarchiveOne(id, eventName);
+                    else deleteArchivedRecord(id, eventName);
                 });
 
                 // Wire dos filtros — text inputs atualizam state; selects/dates aplicam na hora
@@ -3939,8 +4028,7 @@
             let archived = [];
             let archiveError = false;
             try {
-                const { data, error } = await supabase.from('archived_records').select('*');
-                if (error) throw error;
+                const data = await fetchAllPages('archived_records');
                 archived = (data || []).map(fromDB);
             } catch (e) {
                 archiveError = true;
