@@ -807,11 +807,9 @@
         async function fetchTableData(tableName, dataKey) {
             if (!userProfile) return;
 
-            // Busca inicial
+            // Busca inicial. Para gestores, a visibilidade é controlada pela RLS
+            // (registros do próprio gestor + registros do mesmo setor), sem filtro explícito.
             let qb = supabase.from(tableName).select('*');
-            if (tableName === 'records' && userProfile.isManager && !userProfile.isAdmin) {
-                qb = qb.eq('manager_id', currentUser.id);
-            }
             if (tableName === 'records') qb = qb.order('created_at', { ascending: false });
 
             const { data, error } = await qb;
@@ -823,19 +821,14 @@
 
             globalData[dataKey] = (data || []).map(fromDB);
 
-            // Configura listener de tempo real
+            // Configura listener de tempo real. RLS controla a visibilidade;
+            // sem filtro no canal para não perder eventos de colegas do mesmo setor.
             const channelOpts = { event: '*', schema: 'public', table: tableName };
-            if (tableName === 'records' && userProfile.isManager && !userProfile.isAdmin) {
-                channelOpts.filter = `manager_id=eq.${currentUser.id}`;
-            }
 
             const channel = supabase
                 .channel(`rt_${tableName}_${Date.now()}`)
                 .on('postgres_changes', channelOpts, async () => {
                     let rq = supabase.from(tableName).select('*');
-                    if (tableName === 'records' && userProfile.isManager && !userProfile.isAdmin) {
-                        rq = rq.eq('manager_id', currentUser.id);
-                    }
                     if (tableName === 'records') rq = rq.order('created_at', { ascending: false });
 
                     const { data: fresh } = await rq;
@@ -1268,6 +1261,7 @@
                 case 'adminCreateUserProfile': renderAdminCreateUserProfilePage(); break;
                 case 'historicoGeral': renderHistoricoGeral(); break;
                 case 'adminAnalytics': renderAnalyticsPage(); break;
+                case 'archiveSelection': renderArchiveSelection(); break;
                 case 'resetPassword': renderResetPasswordPage(); break;
                 default: renderLoginPage();
             }
@@ -1688,6 +1682,19 @@
                             </div>
                         </div>
                     </div>
+                    <button id="mgr-btn-analytics" class="exec-card p-5 w-full text-left" style="border-left:4px solid #6366f1;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px">
+                        <div style="display:flex;align-items:center;gap:14px">
+                            <div style="width:44px;height:44px;flex-shrink:0;border-radius:11px;background:#eef2ff;display:flex;align-items:center;justify-content:center">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#4f46e5" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
+                            </div>
+                            <div>
+                                <p style="font-size:15px;font-weight:700;color:var(--apple-text)">Analytics</p>
+                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:2px">Indicadores dos seus setores: eventos, profissionais e classificações de QM</p>
+                            </div>
+                        </div>
+                        <span style="flex-shrink:0;color:#6366f1;font-size:13px;font-weight:700;display:flex;align-items:center;gap:4px">Abrir <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg></span>
+                    </button>
+
                     <div>
                         <p class="section-label">Ações</p>
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1711,14 +1718,21 @@
                                 <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Arquivamento</p>
                                 <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Registros arquivados</p>
                             </button>
+                            <button id="btn-export-consolidada" class="action-card">
+                                <div class="action-icon" style="background:#ecfeff"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#0891b2" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5v6m0 0-3-3m3 3 3-3M3.75 6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v9A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6Z"/></svg></div>
+                                <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Exportar Base</p>
+                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Ativos + arquivados (XLSX)</p>
+                            </button>
                         </div>
                     </div>
                 </div>
             `;
+            document.getElementById('mgr-btn-analytics').addEventListener('click', () => { currentView = 'adminAnalytics'; renderApp(); });
             document.getElementById('btn-new-record').addEventListener('click', () => { currentView = 'newRecord'; renderApp(); });
             document.getElementById('btn-import-records').addEventListener('click', () => { currentView = 'importRecords'; renderApp(); });
             document.getElementById('btn-history').addEventListener('click', () => { currentView = 'history'; renderApp(); });
             document.getElementById('btn-historico-geral').addEventListener('click', () => { currentView = 'historicoGeral'; renderApp(); });
+            document.getElementById('btn-export-consolidada').addEventListener('click', exportConsolidatedBase);
         }
 
         // Renderiza o formulário para inclusão de novo registro
@@ -2936,6 +2950,13 @@
                                 <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Registros arquivados</p>
                             </button>
                         </div>
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                            <button id="admin-btn-export-consolidada" class="action-card">
+                                <div class="action-icon" style="background:#ecfeff"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#0891b2" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5v6m0 0-3-3m3 3 3-3M3.75 6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v9A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6Z"/></svg></div>
+                                <p style="font-size:14px;font-weight:700;color:var(--apple-text)">Exportar Base Consolidada</p>
+                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:3px">Ativos + arquivados (XLSX)</p>
+                            </button>
+                        </div>
                     </div>
 
                     <div>
@@ -2944,11 +2965,11 @@
                             <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                 <div>
                                     <p style="font-size:14px;font-weight:700;color:#92400e">Guardar Dados</p>
-                                    <p style="font-size:12px;color:#78716c;margin-top:3px">Move todos os registros ativos para o Arquivamento e limpa o quadro atual. Esta ação não pode ser desfeita.</p>
+                                    <p style="font-size:12px;color:#78716c;margin-top:3px">Selecione quais registros ativos deseja mover para o Arquivamento. Você pode manter lançamentos que ainda não devem ser arquivados (ex: pertencem ao próximo período). Esta ação não pode ser desfeita.</p>
                                 </div>
                                 <button id="admin-btn-guardar-dados" style="flex-shrink:0;padding:10px 20px;background:#f59e0b;color:#fff;font-size:13px;font-weight:700;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;transition:background .2s" onmouseover="this.style.background='#d97706'" onmouseout="this.style.background='#f59e0b'">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"/></svg>
-                                    Guardar Dados
+                                    Selecionar e Arquivar
                                 </button>
                             </div>
                         </div>
@@ -2992,33 +3013,41 @@
             document.getElementById('admin-manage-rules').onclick = () => { currentView = 'adminManageRules'; renderApp(); };
             document.getElementById('admin-manage-users').onclick = () => { currentView = 'adminManageUsers'; renderApp(); };
             document.getElementById('admin-btn-guardar-dados').onclick = () => {
-                const count = globalData.records.length;
-                if (count === 0) { showNotification('Não há registros ativos para arquivar.', 'info'); return; }
-                confirmAction(
-                    'Guardar Dados',
-                    `Isso irá mover <strong>${count} registro(s)</strong> do histórico ativo para o Arquivamento. O quadro ficará vazio após a operação. Esta ação não pode ser desfeita. Deseja continuar?`,
-                    archiveAllRecords
-                );
+                if (globalData.records.length === 0) { showNotification('Não há registros ativos para arquivar.', 'info'); return; }
+                currentView = 'archiveSelection'; renderApp();
             };
+            document.getElementById('admin-btn-export-consolidada').onclick = exportConsolidatedBase;
         }
 
-        // Arquiva todos os registros ativos na tabela archived_records e limpa records
-        async function archiveAllRecords() {
+        // Arquiva uma seleção específica de registros: move de records → archived_records
+        async function archiveSelectedRecords(idsToArchive) {
             try {
+                if (!Array.isArray(idsToArchive) || idsToArchive.length === 0) {
+                    showNotification('Nenhum registro selecionado para arquivar.', 'info'); return;
+                }
                 showNotification('Arquivando registros...', 'info', 5000);
 
-                const { data: allRecords, error: fetchError } = await supabase
-                    .from('records').select('*');
-                if (fetchError) throw fetchError;
+                const batchSize = 100;
+                const idSet = new Set(idsToArchive);
 
-                if (!allRecords || allRecords.length === 0) {
-                    showNotification('Não há registros para arquivar.', 'info'); return;
+                // Busca somente os registros selecionados (respeitando RLS)
+                const selectedRows = [];
+                const idsArr = [...idSet];
+                for (let i = 0; i < idsArr.length; i += batchSize) {
+                    const slice = idsArr.slice(i, i + batchSize);
+                    const { data, error } = await supabase.from('records').select('*').in('id', slice);
+                    if (error) throw error;
+                    if (data) selectedRows.push(...data);
+                }
+
+                if (selectedRows.length === 0) {
+                    showNotification('Não foi possível localizar os registros selecionados.', 'error');
+                    return;
                 }
 
                 const batchId = crypto.randomUUID();
                 const archivedAt = new Date().toISOString();
-
-                const toInsert = allRecords.map(r => ({
+                const toInsert = selectedRows.map(r => ({
                     original_id: r.id,
                     archive_batch_id: batchId,
                     archived_at: archivedAt,
@@ -3039,26 +3068,201 @@
                     created_at: r.created_at,
                 }));
 
-                const batchSize = 100;
                 for (let i = 0; i < toInsert.length; i += batchSize) {
                     const { error: insertError } = await supabase
                         .from('archived_records').insert(toInsert.slice(i, i + batchSize));
                     if (insertError) throw insertError;
                 }
 
-                const ids = allRecords.map(r => r.id);
+                const ids = selectedRows.map(r => r.id);
                 for (let i = 0; i < ids.length; i += batchSize) {
                     const { error: deleteError } = await supabase
                         .from('records').delete().in('id', ids.slice(i, i + batchSize));
                     if (deleteError) throw deleteError;
                 }
 
-                showNotification(`${allRecords.length} registro(s) arquivados com sucesso!`, 'success');
+                showNotification(`${selectedRows.length} registro(s) arquivados com sucesso!`, 'success');
+                currentView = 'adminDashboard';
                 await loadAllData();
             } catch (err) {
                 const msg = err?.message || JSON.stringify(err);
                 showNotification(`Erro ao arquivar: ${msg}`, 'error', 8000);
-                console.error('[archiveAllRecords]', err);
+                console.error('[archiveSelectedRecords]', err);
+            }
+        }
+
+        // Tela de seleção dos registros a arquivar (checkbox por lançamento)
+        function renderArchiveSelection() {
+            if (!userProfile?.isAdmin) { currentView = 'login'; renderApp(); return; }
+
+            const records = [...globalData.records].sort((a, b) => {
+                const da = a.eventDate || ''; const db = b.eventDate || '';
+                return db.localeCompare(da);
+            });
+            // Estado local de seleção: inicia com todos marcados (comportamento antigo por padrão)
+            const selected = new Set(records.map(r => r.id));
+
+            const qmBadge = (cls) => {
+                const map = { A: 'badge-qm badge-qm-a', B: 'badge-qm badge-qm-b', C: 'badge-qm badge-qm-c', D: 'badge-qm badge-qm-d' };
+                return `<span class="${map[cls] || 'badge-qm badge-qm-d'}">${cls || '-'}</span>`;
+            };
+            const escapeAttr = (s) => String(s == null ? '' : s).replace(/"/g, '&quot;');
+
+            const renderRows = () => records.map(r => `
+                <tr class="tbl-row" data-rec-id="${r.id}">
+                    <td style="padding:10px 16px">
+                        <input type="checkbox" class="arch-select h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer" data-id="${r.id}" ${selected.has(r.id) ? 'checked' : ''}>
+                    </td>
+                    <td style="padding:10px 16px">
+                        <p class="text-xs font-semibold text-slate-800">${r.eventName || 'N/A'}</p>
+                        <p class="text-xs text-slate-500">${r.eventDate ? new Date(r.eventDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A'}${r.gameTime ? ' · ' + r.gameTime : ''}</p>
+                    </td>
+                    <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px;max-width:140px;overflow:hidden;text-overflow:ellipsis">${r.gameCategory || 'N/A'}</td>
+                    <td class="whitespace-nowrap text-center" style="padding:10px 16px">${qmBadge(r.qmClassification)}</td>
+                    <td class="text-xs text-slate-700 font-medium whitespace-nowrap" style="padding:10px 16px">${r.employeeName || 'N/A'}</td>
+                    <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${r.sector || '-'}</td>
+                    <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${r.managerName || '-'}</td>
+                    <td class="text-xs text-slate-500" style="padding:10px 16px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(r.notes || '')}">${r.notes || '—'}</td>
+                </tr>`).join('');
+
+            const updateCount = () => {
+                const el = document.getElementById('arch-sel-count');
+                if (el) el.textContent = `${selected.size} de ${records.length} selecionado(s)`;
+                const btn = document.getElementById('arch-btn-confirm');
+                if (btn) btn.disabled = selected.size === 0;
+            };
+
+            appContent.innerHTML = `
+                <div class="animate-fadeIn space-y-5">
+                    <div class="exec-card p-5">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <p style="font-size:11px;font-weight:600;color:var(--apple-2nd);letter-spacing:.04em;text-transform:uppercase">Arquivamento</p>
+                                <h2 style="font-size:20px;font-weight:700;color:var(--apple-text);margin-top:2px">Guardar Dados — Seleção</h2>
+                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:2px">Marque os registros que deseja arquivar. Os desmarcados permanecem no quadro ativo (ex: lançamentos que pertencem ao próximo período).</p>
+                            </div>
+                            <button id="arch-btn-back" class="btn-secondary" style="font-size:12px;padding:7px 12px">← Voltar</button>
+                        </div>
+                    </div>
+
+                    <div class="exec-card p-5">
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
+                            <div class="flex items-center gap-3 flex-wrap">
+                                <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--apple-text);cursor:pointer">
+                                    <input type="checkbox" id="arch-select-all" class="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer" checked>
+                                    Selecionar todos
+                                </label>
+                                <button id="arch-btn-none" class="btn-secondary" style="font-size:11px;padding:5px 10px">Limpar seleção</button>
+                                <span id="arch-sel-count" style="font-size:12px;color:var(--apple-2nd);font-weight:600"></span>
+                            </div>
+                            <button id="arch-btn-confirm" class="btn-primary" style="font-size:13px;padding:9px 16px;background:#f59e0b;border:none">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.25 7.5l-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"/></svg>
+                                Arquivar Selecionados
+                            </button>
+                        </div>
+                        <div class="tbl-scroll-wrap border border-slate-100 rounded-xl">
+                            <table class="tbl min-w-full">
+                                <thead><tr>
+                                    <th style="width:44px"></th>
+                                    <th>Evento</th><th>Categoria</th><th class="text-center">QM</th>
+                                    <th>Funcionário</th><th>Setor</th><th>Gestor</th><th>Obs.</th>
+                                </tr></thead>
+                                <tbody id="arch-tbody">${renderRows()}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            updateCount();
+
+            document.getElementById('arch-btn-back').onclick = () => { currentView = 'adminDashboard'; renderApp(); };
+
+            document.getElementById('arch-tbody').addEventListener('change', (e) => {
+                const cb = e.target.closest('.arch-select');
+                if (!cb) return;
+                const id = cb.dataset.id;
+                if (cb.checked) selected.add(id); else selected.delete(id);
+                const allCb = document.getElementById('arch-select-all');
+                if (allCb) allCb.checked = selected.size === records.length;
+                updateCount();
+            });
+
+            document.getElementById('arch-select-all').addEventListener('change', (e) => {
+                const check = e.target.checked;
+                selected.clear();
+                if (check) records.forEach(r => selected.add(r.id));
+                document.querySelectorAll('.arch-select').forEach(cb => { cb.checked = check; });
+                updateCount();
+            });
+
+            document.getElementById('arch-btn-none').onclick = () => {
+                selected.clear();
+                document.querySelectorAll('.arch-select').forEach(cb => { cb.checked = false; });
+                document.getElementById('arch-select-all').checked = false;
+                updateCount();
+            };
+
+            document.getElementById('arch-btn-confirm').onclick = () => {
+                if (selected.size === 0) { showNotification('Selecione ao menos um registro.', 'info'); return; }
+                const ids = [...selected];
+                const kept = records.length - ids.length;
+                const keptMsg = kept > 0
+                    ? `<br><span style="color:#0891b2">${kept} registro(s) permanecerão no quadro ativo.</span>`
+                    : '';
+                confirmAction(
+                    'Confirmar Arquivamento',
+                    `Isso irá mover <strong>${ids.length} registro(s)</strong> para o Arquivamento.${keptMsg}<br>Esta ação não pode ser desfeita. Deseja continuar?`,
+                    () => archiveSelectedRecords(ids)
+                );
+            };
+        }
+
+        // Exporta uma base consolidada (registros ativos + arquivados) em um único XLSX.
+        // Para gestores, o RLS já limita aos registros dos seus setores.
+        async function exportConsolidatedBase() {
+            try {
+                showNotification('Preparando base consolidada...', 'info', 4000);
+
+                const activeRows = (globalData.records || []).map(r => ({ ...r, _status: 'Ativo', _archivedAt: null }));
+
+                const { data: archivedRaw, error } = await supabase
+                    .from('archived_records').select('*').order('archived_at', { ascending: false });
+                if (error) throw error;
+
+                const archivedRows = (archivedRaw || []).map(fromDB).map(r => ({ ...r, _status: 'Arquivado', _archivedAt: r.archivedAt }));
+
+                const all = [...activeRows, ...archivedRows];
+                if (all.length === 0) { showNotification('Não há registros para exportar.', 'info'); return; }
+
+                const sheet = all.map(r => ({
+                    "Status": r._status,
+                    "Data Arquivamento": r._archivedAt ? new Date(r._archivedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '',
+                    "Data Criação": r.createdAt?.toDate?.().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) || 'N/A',
+                    "Evento": r.eventName || 'N/A',
+                    "Tipo": r.eventType === 'outros' ? 'Outros' : 'Jogo',
+                    "Data Evento": r.eventDate ? new Date(r.eventDate + 'T00:00:00').toLocaleDateString('pt-BR') : 'N/A',
+                    "Horário": r.gameTime || '-',
+                    "Cat. Jogo": r.gameCategory || '-',
+                    "QM": r.qmClassification || '-',
+                    "Valor QM": Number(r.qmValue) || 0,
+                    "Chapa": globalData.employees.find(e => e.id === r.employeeId)?.registration || '-',
+                    "Funcionário": r.employeeName || 'N/A',
+                    "Setor": r.sector || '-',
+                    "Gestor Lançador": r.managerName || '-',
+                    "Observações": r.notes || '-',
+                }));
+
+                const ws = XLSX.utils.json_to_sheet(sheet);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Base Consolidada');
+                const stamp = new Date().toISOString().slice(0, 10);
+                XLSX.writeFile(wb, `base_consolidada_${stamp}.xlsx`);
+                showNotification(`Base consolidada exportada (${all.length} registro(s)).`, 'success');
+            } catch (err) {
+                const msg = err?.message || JSON.stringify(err);
+                showNotification(`Erro ao exportar base consolidada: ${msg}`, 'error', 8000);
+                console.error('[exportConsolidatedBase]', err);
             }
         }
 
@@ -3272,7 +3476,8 @@
         // Analytics (somente admin) — painel completo de indicadores
         // ============================================================
         async function renderAnalyticsPage() {
-            if (!userProfile?.isAdmin) { currentView = 'login'; renderApp(); return; }
+            if (!userProfile?.isAdmin && !userProfile?.isManager) { currentView = 'login'; renderApp(); return; }
+            const backView = userProfile.isAdmin ? 'adminDashboard' : 'managerDashboard';
 
             const QM_COLORS = { A: '#0071e3', B: '#34c759', C: '#ff9500', D: '#8e8e93' };
             const QM_ORDER = ['A', 'B', 'C', 'D'];
@@ -3302,7 +3507,7 @@
                     </div>
                 </div>
             `;
-            document.getElementById('an-back').onclick = () => { currentView = 'adminDashboard'; renderApp(); };
+            document.getElementById('an-back').onclick = () => { currentView = backView; renderApp(); };
 
             // Busca registros arquivados para uma análise histórica completa
             let archived = [];

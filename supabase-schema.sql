@@ -55,6 +55,29 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.delete_auth_user TO authenticated;
 
+-- Retorna os setores do usuário autenticado (unindo campo legado 'sector' e novo array 'sectors').
+-- Usado nas políticas RLS para permitir que gestores do mesmo setor vejam os mesmos dados.
+CREATE OR REPLACE FUNCTION public.current_user_sectors()
+RETURNS text[]
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT COALESCE(
+           (SELECT
+              CASE
+                WHEN sectors IS NOT NULL AND array_length(sectors, 1) > 0 THEN sectors
+                WHEN sector IS NOT NULL AND sector <> '' THEN ARRAY[sector]
+                ELSE ARRAY[]::text[]
+              END
+            FROM public.users_profile WHERE id = auth.uid()),
+           ARRAY[]::text[]
+         );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.current_user_sectors TO authenticated;
+
 -- ============================================================
 -- 2. Tabelas
 -- ============================================================
@@ -201,9 +224,14 @@ CREATE POLICY "Admins leem todos os registros"
   USING (is_admin());
 
 DROP POLICY IF EXISTS "Gestores leem seus registros" ON public.records;
-CREATE POLICY "Gestores leem seus registros"
+-- Gestores enxergam TODOS os registros dos setores em que estão vinculados
+-- (permite que 2+ gestores do mesmo setor compartilhem a visualização).
+CREATE POLICY "Gestores leem registros do setor"
   ON public.records FOR SELECT TO authenticated
-  USING (manager_id = auth.uid());
+  USING (
+    manager_id = auth.uid()
+    OR (sector IS NOT NULL AND sector = ANY(public.current_user_sectors()))
+  );
 
 DROP POLICY IF EXISTS "Gestores e admins inserem registros" ON public.records;
 CREATE POLICY "Gestores e admins inserem registros"
@@ -299,12 +327,15 @@ CREATE POLICY "Admins leem registros arquivados"
   ON public.archived_records FOR SELECT TO authenticated
   USING (is_admin());
 
--- Gestores podem consultar os registros arquivados que eles próprios lançaram
--- (registros das suas equipes). Continuam sem permissão de inserir/excluir.
+-- Gestores enxergam os registros arquivados dos seus setores (mesma lógica de records).
+-- Continuam sem permissão de inserir/excluir.
 DROP POLICY IF EXISTS "Gestores leem seus registros arquivados" ON public.archived_records;
-CREATE POLICY "Gestores leem seus registros arquivados"
+CREATE POLICY "Gestores leem registros arquivados do setor"
   ON public.archived_records FOR SELECT TO authenticated
-  USING (manager_id = auth.uid());
+  USING (
+    manager_id = auth.uid()
+    OR (sector IS NOT NULL AND sector = ANY(public.current_user_sectors()))
+  );
 
 DROP POLICY IF EXISTS "Somente admins inserem registros arquivados" ON public.archived_records;
 CREATE POLICY "Somente admins inserem registros arquivados"
