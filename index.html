@@ -4170,6 +4170,7 @@
                 const total = data.length;
                 const jogos = data.filter(r => etOf(r) === 'jogo').length;
                 const outros = total - jogos;
+                const showValues = !!userProfile.isAdmin;
                 const totalValue = data.reduce((a, r) => a + (Number(r.qmValue) || 0), 0);
                 const avgValue = total ? Math.round(totalValue / total) : 0;
                 const distinctPros = new Set(data.filter(r => r.employeeName).map(r => r.employeeName.toLowerCase())).size;
@@ -4258,7 +4259,7 @@
                             ${kpi(total, 'Eventos', busiest ? `Pico: ${busiest.short} (${busiest.value})` : '')}
                             ${kpi(jogos, 'Jogos', total ? `${Math.round(jogos / total * 100)}% do total` : '')}
                             ${kpi(outros, 'Outros eventos', total ? `${Math.round(outros / total * 100)}% do total` : '')}
-                            ${kpi(brl(totalValue), 'Valor total QM', `Ticket médio ${brl(avgValue)}`)}
+                            ${showValues ? kpi(brl(totalValue), 'Valor total QM', `Ticket médio ${brl(avgValue)}`) : ''}
                             ${kpi(distinctPros, 'Profissionais', topPro ? `Top: ${esc(topPro.label)}` : '')}
                             ${kpi(sectorsUsed, 'Setores ativos', topSector ? `Top: ${esc(topSector.label)}` : '')}
                             ${kpi(catsUsed, 'Categorias de jogo')}
@@ -4270,7 +4271,7 @@
                                 { label: 'Jogo', value: jogos, color: TYPE_COLORS.jogo },
                                 { label: 'Outros', value: outros, color: TYPE_COLORS.outros },
                             ]))}
-                            ${card('Classificação de QM', 'Distribuição por grau (A / B / C / D)', hbarChart(qmCounts) + `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--apple-sep);display:flex;gap:16px;flex-wrap:wrap">${qmValueByClass.map(x => `<span style="font-size:11px;color:var(--apple-2nd)"><span class="an-legend-dot" style="background:${QM_COLORS[x.c]}"></span>${x.c}: <strong style="color:var(--apple-text)">${brl(x.v)}</strong></span>`).join('')}</div>`)}
+                            ${card('Classificação de QM', 'Distribuição por grau (A / B / C / D)', hbarChart(qmCounts) + (showValues ? `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--apple-sep);display:flex;gap:16px;flex-wrap:wrap">${qmValueByClass.map(x => `<span style="font-size:11px;color:var(--apple-2nd)"><span class="an-legend-dot" style="background:${QM_COLORS[x.c]}"></span>${x.c}: <strong style="color:var(--apple-text)">${brl(x.v)}</strong></span>`).join('')}</div>` : ''))}
                         </div>
 
                         ${card('Eventos por mês', 'Volume de registros nos últimos meses', vbarChart(timeline, { color: 'var(--apple-blue)' }))}
@@ -4280,10 +4281,14 @@
                             ${card('Setores × tipo de evento', 'Quais setores mais fazem cada tipo (top 10)', stackedChart(sectorType, [{ key: 'jogo', label: 'Jogo', color: TYPE_COLORS.jogo }, { key: 'outros', label: 'Outros', color: TYPE_COLORS.outros }]))}
                         </div>
 
+                        ${showValues ? `
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
                             ${card('Profissionais que mais fazem QM', 'Ranking por nº de registros (top 12)', hbarChart(proByCount))}
                             ${card('Profissionais por valor', 'Ranking por valor acumulado de QM (top 10)', hbarChart(proByValue, { fmt: brl }))}
                         </div>
+                        ` : `
+                        ${card('Profissionais que mais fazem QM', 'Ranking por nº de registros (top 12)', hbarChart(proByCount))}
+                        `}
 
                         ${card('Mapa de calor — Setor × Classificação de QM', 'Contagem de registros por grau em cada setor (top 12 setores)', heatmap(hmSectors, QM_ORDER, hmVal))}
 
