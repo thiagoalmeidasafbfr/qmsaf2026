@@ -3640,57 +3640,212 @@
                             // Remove empty batches
                             Object.keys(batchMap).forEach(k => { if (batchMap[k].records.length === 0) delete batchMap[k]; });
                             showNotification('Registro excluído do arquivamento.', 'success');
-                            renderContent(document.getElementById('hg-batch-select')?.value || '');
-                            // Update total count display
-                            const countEl = document.querySelector('#hg-content [style*="font-size:28px"]');
-                            if (countEl) countEl.textContent = archived.length;
+                            renderContent();
                         }
                     );
                 };
 
-                const renderContent = (batchId) => {
-                    const data = batchId ? (batchMap[batchId]?.records || []) : archived;
-                    const batchInfo = batchId && batchMap[batchId]
-                        ? `<div style="margin-bottom:16px;padding:12px 16px;background:#fef9c3;border:1px solid #fde68a;border-radius:10px">
-                               <p style="font-size:12px;font-weight:600;color:#92400e">Lote arquivado em ${new Date(batchMap[batchId].archivedAt).toLocaleString('pt-BR')} por ${getArchivedByName(batchMap[batchId].archivedBy)} — ${data.length} registro(s)</p>
+                // ---- Estado local dos filtros (independente do histórico ativo) ----
+                const hgFilterState = {
+                    searchTerm: '', eventName: '', employeeId: '', gameCategory: '',
+                    notes: '', sector: '', managerName: '',
+                    eventDateStart: '', eventDateEnd: '',
+                    creationDateStart: '', creationDateEnd: '',
+                    batchId: ''
+                };
+                const hgFilterIdMap = {
+                    'hg-filter-search': 'searchTerm',
+                    'hg-filter-event-name': 'eventName',
+                    'hg-filter-employee': 'employeeId',
+                    'hg-filter-category': 'gameCategory',
+                    'hg-filter-notes': 'notes',
+                    'hg-filter-sector': 'sector',
+                    'hg-filter-manager': 'managerName',
+                    'hg-filter-event-date-start': 'eventDateStart',
+                    'hg-filter-event-date-end': 'eventDateEnd',
+                    'hg-filter-creation-date-start': 'creationDateStart',
+                    'hg-filter-creation-date-end': 'creationDateEnd',
+                    'hg-batch-select': 'batchId',
+                };
+
+                const getFilteredArchived = () => {
+                    let data = hgFilterState.batchId
+                        ? [...(batchMap[hgFilterState.batchId]?.records || [])]
+                        : [...archived];
+
+                    const term = hgFilterState.searchTerm.trim().toLowerCase();
+                    if (term) {
+                        data = data.filter(r =>
+                            (r.eventName && r.eventName.toLowerCase().includes(term)) ||
+                            (r.employeeName && r.employeeName.toLowerCase().includes(term)) ||
+                            (r.notes && r.notes.toLowerCase().includes(term))
+                        );
+                    }
+                    if (hgFilterState.eventName.trim()) {
+                        const t = hgFilterState.eventName.trim().toLowerCase();
+                        data = data.filter(r => r.eventName?.toLowerCase().includes(t));
+                    }
+                    if (hgFilterState.employeeId) {
+                        data = data.filter(r => r.employeeId === hgFilterState.employeeId);
+                    }
+                    if (hgFilterState.gameCategory) {
+                        data = data.filter(r => r.gameCategory === hgFilterState.gameCategory);
+                    }
+                    if (hgFilterState.notes.trim()) {
+                        const n = hgFilterState.notes.trim().toLowerCase();
+                        data = data.filter(r => r.notes?.toLowerCase().includes(n));
+                    }
+                    if (hgFilterState.sector) {
+                        data = data.filter(r => r.sector === hgFilterState.sector);
+                    }
+                    if (hgFilterState.managerName) {
+                        data = data.filter(r => r.managerName === hgFilterState.managerName);
+                    }
+                    if (hgFilterState.eventDateStart) {
+                        data = data.filter(r => r.eventDate && r.eventDate >= hgFilterState.eventDateStart);
+                    }
+                    if (hgFilterState.eventDateEnd) {
+                        data = data.filter(r => r.eventDate && r.eventDate <= hgFilterState.eventDateEnd);
+                    }
+                    if (hgFilterState.creationDateStart) {
+                        const start = new Date(hgFilterState.creationDateStart + 'T00:00:00');
+                        data = data.filter(r => r.createdAt?.toDate?.() >= start);
+                    }
+                    if (hgFilterState.creationDateEnd) {
+                        const end = new Date(hgFilterState.creationDateEnd + 'T23:59:59');
+                        data = data.filter(r => r.createdAt?.toDate?.() <= end);
+                    }
+                    return data;
+                };
+
+                const renderContent = () => {
+                    const data = getFilteredArchived();
+                    const bId = hgFilterState.batchId;
+                    const batchInfo = bId && batchMap[bId]
+                        ? `<div style="margin-bottom:14px;padding:11px 14px;background:var(--gold-tint);border:1px solid rgba(161,118,53,.28);border-radius:10px;border-left:3px solid var(--gold)">
+                               <p style="font-size:12px;font-weight:600;color:var(--gold-h)">Lote arquivado em ${new Date(batchMap[bId].archivedAt).toLocaleString('pt-BR')} por ${getArchivedByName(batchMap[bId].archivedBy)} — ${batchMap[bId].records.length} registro(s) no lote${data.length !== batchMap[bId].records.length ? ` · exibindo ${data.length}` : ''}</p>
                            </div>` : '';
-                    document.getElementById('hg-table-container').innerHTML = batchInfo + generateTable(data);
-                    // Bind delete buttons via event delegation
-                    document.getElementById('hg-table-container').addEventListener('click', (e) => {
-                        const btn = e.target.closest('.btn-delete-archived');
-                        if (!btn) return;
-                        const id = btn.dataset.id;
-                        const row = btn.closest('tr[data-archived-id]');
-                        const eventName = row?.querySelector('p.font-semibold')?.textContent || id;
-                        deleteArchivedRecord(id, eventName);
-                    });
+                    const totalMsg = `<p style="font-size:12px;color:var(--ink-3);margin-bottom:10px">Exibindo <strong style="color:var(--ink)">${data.length}</strong> de ${archived.length} registro(s) arquivado(s)</p>`;
+                    document.getElementById('hg-table-container').innerHTML = batchInfo + totalMsg + generateTable(data);
                     currentArchivedData = data;
+                    // Update KPI total
+                    const kpi = document.getElementById('hg-total-count');
+                    if (kpi) kpi.textContent = data.length;
+                };
+
+                const clearHgFilters = () => {
+                    Object.keys(hgFilterState).forEach(k => { hgFilterState[k] = ''; });
+                    document.querySelectorAll('#hg-filters-container .filter-input, #hg-batch-select').forEach(el => { el.value = ''; });
+                    renderContent();
                 };
 
                 const batchOptions = batchList.map(b =>
                     `<option value="${b.id}">Lote de ${new Date(b.archivedAt).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'})} — ${b.records.length} registro(s) — por ${getArchivedByName(b.archivedBy)}</option>`
                 ).join('');
 
+                // Opções de setor/gestor derivadas do próprio conjunto arquivado
+                const sectorOptions = [...new Set(archived.map(r => r.sector).filter(Boolean))].sort();
+                const managerOptions = [...new Set(archived.map(r => r.managerName).filter(Boolean))].sort();
+                const employeeOptions = [...globalData.employees]
+                    .filter(e => archived.some(r => r.employeeId === e.id))
+                    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
                 document.getElementById('hg-content').innerHTML = `
                     <div class="p-5 space-y-5">
                         <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                            <div class="flex-1">
-                                <label style="font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px">Filtrar por Lote</label>
-                                <select id="hg-batch-select" style="width:100%;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;color:#334155;background:#fff;outline:none">
+                            <div style="flex:1;min-width:200px">
+                                <label class="filter-label" style="display:block;margin-bottom:6px">Filtrar por Lote de Arquivamento</label>
+                                <select id="hg-batch-select" class="filter-input" style="width:100%">
                                     <option value="">Todos os lotes (${archived.length} registros)</option>
                                     ${batchOptions}
                                 </select>
                             </div>
-                            <div style="text-align:right;min-width:90px">
-                                <p style="font-size:28px;font-weight:700;color:#0f172a;line-height:1">${archived.length}</p>
-                                <p style="font-size:11px;color:#94a3b8;margin-top:2px">registros arquivados</p>
+                            <div style="text-align:right;min-width:110px">
+                                <p id="hg-total-count" class="stat-num" style="font-size:28px">${archived.length}</p>
+                                <p class="stat-label" style="margin-top:4px">arquivados</p>
                             </div>
                         </div>
-                        <div id="hg-table-container">${generateTable(archived)}</div>
+
+                        <div id="hg-filters-container" class="filter-wrapper space-y-4">
+                            <div class="filter-group">
+                                <label for="hg-filter-search" class="filter-label">Busca Rápida</label>
+                                <div class="relative">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                    <input type="text" id="hg-filter-search" class="filter-input pl-8" placeholder="Nome, evento, observações..." value="${hgFilterState.searchTerm}">
+                                </div>
+                            </div>
+                            <details class="filter-toggle w-full" open>
+                                <summary>Filtros Avançados <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></summary>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
+                                    <div class="filter-group">
+                                        <label for="hg-filter-event-name" class="filter-label">Nome do Evento</label>
+                                        <input type="text" id="hg-filter-event-name" class="filter-input" placeholder="Ex: Botafogo vs..." value="${hgFilterState.eventName}">
+                                    </div>
+                                    <div class="filter-group">
+                                        <label for="hg-filter-notes" class="filter-label">Observações</label>
+                                        <input type="text" id="hg-filter-notes" class="filter-input" placeholder="Texto..." value="${hgFilterState.notes}">
+                                    </div>
+                                    <div class="filter-group">
+                                        <label for="hg-filter-employee" class="filter-label">Funcionário</label>
+                                        <select id="hg-filter-employee" class="filter-input">
+                                            <option value="">Todos</option>
+                                            ${employeeOptions.map(e => `<option value="${e.id}">${e.name}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div class="filter-group">
+                                        <label for="hg-filter-category" class="filter-label">Categoria</label>
+                                        <select id="hg-filter-category" class="filter-input">
+                                            <option value="">Todas</option>
+                                            ${GAME_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    ${userProfile.isAdmin ? `
+                                        <div class="filter-group">
+                                            <label for="hg-filter-sector" class="filter-label">Setor</label>
+                                            <select id="hg-filter-sector" class="filter-input">
+                                                <option value="">Todos</option>
+                                                ${sectorOptions.map(s => `<option value="${s}">${s}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                        <div class="filter-group">
+                                            <label for="hg-filter-manager" class="filter-label">Gestor</label>
+                                            <select id="hg-filter-manager" class="filter-input">
+                                                <option value="">Todos</option>
+                                                ${managerOptions.map(m => `<option value="${m}">${m}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                    ` : ''}
+                                    <div class="filter-group">
+                                        <label for="hg-filter-event-date-start" class="filter-label">Data Evento (De)</label>
+                                        <input type="date" id="hg-filter-event-date-start" class="filter-input" value="${hgFilterState.eventDateStart}">
+                                    </div>
+                                    <div class="filter-group">
+                                        <label for="hg-filter-event-date-end" class="filter-label">Data Evento (Até)</label>
+                                        <input type="date" id="hg-filter-event-date-end" class="filter-input" value="${hgFilterState.eventDateEnd}">
+                                    </div>
+                                    <div class="filter-group">
+                                        <label for="hg-filter-creation-date-start" class="filter-label">Criação (De)</label>
+                                        <input type="date" id="hg-filter-creation-date-start" class="filter-input" value="${hgFilterState.creationDateStart}">
+                                    </div>
+                                    <div class="filter-group">
+                                        <label for="hg-filter-creation-date-end" class="filter-label">Criação (Até)</label>
+                                        <input type="date" id="hg-filter-creation-date-end" class="filter-input" value="${hgFilterState.creationDateEnd}">
+                                    </div>
+                                </div>
+                            </details>
+                            <div class="flex justify-end gap-2.5 pt-1">
+                                <button id="hg-btn-clear-filters" class="btn-secondary" style="font-size:12px;padding:6px 12px">Limpar</button>
+                                <button id="hg-btn-apply-filters" class="btn-primary" style="font-size:12px;padding:6px 12px">Aplicar Filtros</button>
+                            </div>
+                        </div>
+
+                        <div id="hg-table-container"></div>
                     </div>
                 `;
 
-                // Bind delete buttons on initial render
+                renderContent();
+
+                // Bind delete buttons via event delegation (uma única vez no container)
                 document.getElementById('hg-table-container').addEventListener('click', (e) => {
                     const btn = e.target.closest('.btn-delete-archived');
                     if (!btn) return;
@@ -3700,7 +3855,23 @@
                     deleteArchivedRecord(id, eventName);
                 });
 
-                document.getElementById('hg-batch-select').onchange = (e) => renderContent(e.target.value);
+                // Wire dos filtros — text inputs atualizam state; selects/dates aplicam na hora
+                const hgFiltersContainer = document.getElementById('hg-filters-container');
+                const bindFilterEl = (el) => {
+                    el.addEventListener('input', (ev) => {
+                        const key = hgFilterIdMap[ev.target.id];
+                        if (!key) return;
+                        hgFilterState[key] = ev.target.value;
+                        if (ev.target.tagName === 'SELECT' || ev.target.type === 'date') renderContent();
+                    });
+                };
+                hgFiltersContainer.querySelectorAll('.filter-input').forEach(bindFilterEl);
+                document.getElementById('hg-batch-select').addEventListener('change', (e) => {
+                    hgFilterState.batchId = e.target.value;
+                    renderContent();
+                });
+                document.getElementById('hg-btn-apply-filters').onclick = renderContent;
+                document.getElementById('hg-btn-clear-filters').onclick = clearHgFilters;
 
                 const exportBtn = document.getElementById('btn-hg-export-xlsx');
                 exportBtn.disabled = false;
