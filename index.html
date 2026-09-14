@@ -2264,13 +2264,14 @@
             }
 
             // Colunas unificadas para Jogo e Outros
-            // (Tipo QM removido: a importação sempre registra Grau B)
+            // "Tipo QM" (Grau A/B) é respeitado na importação, condicionado à habilitação do funcionário.
             const headers = [
                 "Tipo de Evento",
                 "Nome do Evento",
                 "Data do Evento",
                 "Horário do Evento",
                 "Categoria do Jogo",
+                "Tipo QM",
                 "Funcionário",
                 "Observações"
             ];
@@ -2318,6 +2319,7 @@
                 ["Data do Evento", "Data de realização", "Sim", "DD/MM/AAAA  ou  AAAA-MM-DD"],
                 ["Horário do Evento", "Horário de início em intervalos de 15 min", "Sim", "Ex: 18:00 / 20:30 / 21:00  (ver aba Listas)"],
                 ["Categoria do Jogo", "Categoria — somente quando Tipo = Jogo", "Se Jogo: Sim. Se Outros: deixar em branco", "Ver aba Listas"],
+                ["Tipo QM", "Grau do QM. Grau A só é aplicado a funcionários habilitados; caso contrário é rebaixado para B", "Não (em branco = Grau B)", "A / B"],
                 ["Funcionário", "Nome do funcionário conforme cadastro no sistema", "Sim", "Ver aba Listas  (ou 'Outros' para externos)"],
                 ["Observações", "Campo de observações adicionais", "Obrigatório se Tipo = Outros", "Texto livre"],
                 [""],
@@ -2329,7 +2331,7 @@
                 ["4. O Horário deve estar em intervalos exatos de 15 minutos (ex: 00:00, 00:15, 00:30...)."],
                 ["5. Use exatamente o nome do funcionário conforme listado na aba Listas."],
                 ["   Para funcionários externos, coloque 'Outros' no Funcionário e informe o nome nas Observações."],
-                ["6. Todos os registros importados são classificados como Grau B. O Grau A só está disponível no lançamento manual, para funcionários habilitados."],
+                ["6. Tipo QM: informe 'A' ou 'B' (em branco = Grau B). O Grau A só é aplicado a funcionários habilitados no cadastro; se o funcionário não for habilitado, o registro é rebaixado automaticamente para Grau B."],
                 ["7. Arquivos aceitos: .xlsx, .xls, .csv"]
             ];
             const wsTutorial = XLSX.utils.aoa_to_sheet(tutorialData);
@@ -2360,10 +2362,10 @@
                         </div>
                         <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-5 text-xs text-blue-800 leading-relaxed space-y-2">
                             <p class="font-semibold">Planilha unificada — Jogos e Outros Eventos</p>
-                            <p>Colunas: <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Tipo de Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Nome do Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Data do Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Horário do Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Categoria do Jogo</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Funcionário</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Observações</code></p>
+                            <p>Colunas: <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Tipo de Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Nome do Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Data do Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Horário do Evento</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Categoria do Jogo</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Tipo QM</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Funcionário</code> · <code class="bg-blue-100 px-1 py-0.5 rounded font-mono">Observações</code></p>
                             <p>• <strong>Tipo de Evento = "Jogo":</strong> preencha a Categoria do Jogo; Observações é opcional.</p>
                             <p>• <strong>Tipo de Evento = "Outros":</strong> deixe Categoria em branco; Observações é <strong>obrigatório</strong>.</p>
-                            <p>• Todos os registros importados são classificados como <strong>Grau B</strong>. O Grau A está disponível apenas no lançamento manual.</p>
+                            <p>• <strong>Tipo QM</strong> aceita <strong>A</strong> ou <strong>B</strong> (em branco = Grau B). O Grau A só é aplicado a funcionários <strong>habilitados</strong> no cadastro; para os demais, o registro é rebaixado automaticamente para Grau B.</p>
                             <p>Baixe o modelo para ver a aba <strong>Tutorial</strong> com instruções completas e a aba <strong>Listas</strong> com os valores válidos.</p>
                         </div>
                         <div class="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center">
@@ -2549,9 +2551,17 @@
                                 finalEmployeeName = foundEmployee.name;
                             }
 
-                            // A opção de Grau A não fica disponível na importação:
-                            // todos os registros importados são sempre Grau B.
-                            const qmType = 'B';
+                            // Grau do QM: respeita o "Tipo QM" da planilha, mas condicionado à
+                            // habilitação de cada funcionário. Grau A só é aceito se o funcionário
+                            // for habilitado (canUseGradeA); caso contrário, é rebaixado
+                            // automaticamente para Grau B (mesma regra do lançamento manual).
+                            // Coluna ausente/vazia = Grau B (compatibilidade com planilhas antigas).
+                            const requestedGrade = String(record["Tipo QM"] || '').trim().toUpperCase();
+                            if (requestedGrade && requestedGrade !== 'A' && requestedGrade !== 'B') {
+                                throw new Error(`Tipo QM "${requestedGrade}" inválido. Use "A" ou "B" (ou deixe em branco para Grau B).`);
+                            }
+                            const canUseGradeA = !!(foundEmployee && foundEmployee.canUseGradeA);
+                            const qmType = (requestedGrade === 'A' && canUseGradeA) ? 'A' : 'B';
                             const qmResult = computeQMClassification(qmType, eventDate, gameTime);
 
                             const dataToSave = {
