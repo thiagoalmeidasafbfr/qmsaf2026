@@ -643,23 +643,25 @@
             return [...employees].sort((a, b) => compareNames(a.name, b.name));
         }
 
-        // Ordenações disponíveis nas telas de Histórico e Arquivamento
+        // Ordenações disponíveis nas telas de Histórico e Arquivamento (a primeira é o padrão)
         const RECORD_SORT_OPTIONS = [
-            { value: 'employee', label: 'Funcionário (A–Z)' },
             { value: 'recent', label: 'Mais recentes primeiro' },
+            { value: 'employee', label: 'Funcionário (A–Z)' },
         ];
         const recordSortOptionsHtml = (selected) => RECORD_SORT_OPTIONS
             .map(o => `<option value="${o.value}" ${o.value === selected ? 'selected' : ''}>${o.label}</option>`).join('');
 
+        // 'recent' (padrão): lançamentos mais recentes primeiro.
         // 'employee': funcionário A–Z e, para cada um, eventos em ordem cronológica.
-        // 'recent': lançamentos mais recentes primeiro (ordem antiga do histórico).
-        function sortRecords(records, sortBy = 'employee') {
+        function sortRecords(records, sortBy) {
+            if (sortBy === 'employee') {
+                return [...records].sort((a, b) =>
+                    compareNames(a.employeeName, b.employeeName)
+                    || (a.eventDate || '').localeCompare(b.eventDate || '')
+                    || (a.gameTime || '').localeCompare(b.gameTime || ''));
+            }
             const createdMs = (r) => r.createdAt?.toDate?.().getTime() || 0;
-            if (sortBy === 'recent') return [...records].sort((a, b) => createdMs(b) - createdMs(a));
-            return [...records].sort((a, b) =>
-                compareNames(a.employeeName, b.employeeName)
-                || (a.eventDate || '').localeCompare(b.eventDate || '')
-                || (a.gameTime || '').localeCompare(b.gameTime || ''));
+            return [...records].sort((a, b) => createdMs(b) - createdMs(a));
         }
 
         // Calcula a classificação QM (A/B/C/D) e valor com base no tipo do funcionário, data e horário
@@ -711,7 +713,7 @@
             eventDateEnd: '',
             creationDateStart: '',
             creationDateEnd: '',
-            sortBy: 'employee' // Ordenação da tabela (não é filtro: o "Limpar" mantém a escolha)
+            sortBy: 'recent' // Ordenação da tabela (não é filtro: o "Limpar" mantém a escolha)
         };
 
         // Mapping from filter input IDs to filterState keys for consistent updates
@@ -3595,7 +3597,7 @@
                 const archivedRows = (archivedRaw || []).map(fromDB).map(r => ({ ...r, _status: 'Arquivado', _archivedAt: r.archivedAt }));
 
                 // Por funcionário (A–Z) e data do evento, para facilitar a conferência do DP
-                const all = sortRecords([...activeRows, ...archivedRows]);
+                const all = sortRecords([...activeRows, ...archivedRows], 'employee');
                 if (all.length === 0) { showNotification('Não há registros para exportar.', 'info'); return; }
 
                 const sheet = all.map(r => ({
@@ -3782,7 +3784,7 @@
                     eventDateStart: '', eventDateEnd: '',
                     creationDateStart: '', creationDateEnd: '',
                     batchId: '',
-                    sortBy: 'employee'
+                    sortBy: 'recent'
                 };
                 const hgFilterIdMap = {
                     'hg-filter-search': 'searchTerm',
