@@ -633,6 +633,37 @@
             return times;
         })();
 
+        // Ordem alfabética em português: acentos e maiúsculas/minúsculas não mudam a
+        // posição do nome (ex.: "Álvaro" fica junto dos "A", "bruno" junto dos "B").
+        const nameCollator = new Intl.Collator('pt-BR');
+        function compareNames(a, b) {
+            return nameCollator.compare(String(a || '').trim(), String(b || '').trim());
+        }
+        function sortEmployeesByName(employees) {
+            return [...employees].sort((a, b) => compareNames(a.name, b.name));
+        }
+
+        // Ordenações disponíveis nas telas de Histórico e Arquivamento (a primeira é o padrão)
+        const RECORD_SORT_OPTIONS = [
+            { value: 'recent', label: 'Mais recentes primeiro' },
+            { value: 'employee', label: 'Funcionário (A–Z)' },
+        ];
+        const recordSortOptionsHtml = (selected) => RECORD_SORT_OPTIONS
+            .map(o => `<option value="${o.value}" ${o.value === selected ? 'selected' : ''}>${o.label}</option>`).join('');
+
+        // 'recent' (padrão): lançamentos mais recentes primeiro.
+        // 'employee': funcionário A–Z e, para cada um, eventos em ordem cronológica.
+        function sortRecords(records, sortBy) {
+            if (sortBy === 'employee') {
+                return [...records].sort((a, b) =>
+                    compareNames(a.employeeName, b.employeeName)
+                    || (a.eventDate || '').localeCompare(b.eventDate || '')
+                    || (a.gameTime || '').localeCompare(b.gameTime || ''));
+            }
+            const createdMs = (r) => r.createdAt?.toDate?.().getTime() || 0;
+            return [...records].sort((a, b) => createdMs(b) - createdMs(a));
+        }
+
         // Calcula a classificação QM (A/B/C/D) e valor com base no tipo do funcionário, data e horário
         function computeQMClassification(qmType, eventDate, gameTime) {
             const dateObj = new Date(eventDate + 'T00:00:00');
@@ -681,7 +712,8 @@
             eventDateStart: '',
             eventDateEnd: '',
             creationDateStart: '',
-            creationDateEnd: ''
+            creationDateEnd: '',
+            sortBy: 'recent' // Ordenação da tabela (não é filtro: o "Limpar" mantém a escolha)
         };
 
         // Mapping from filter input IDs to filterState keys for consistent updates
@@ -696,7 +728,8 @@
             'filter-event-date-start': 'eventDateStart',
             'filter-event-date-end': 'eventDateEnd',
             'filter-creation-date-start': 'creationDateStart',
-            'filter-creation-date-end': 'creationDateEnd'
+            'filter-creation-date-end': 'creationDateEnd',
+            'filter-sort': 'sortBy'
         };
 
         // Filtros para a página de Funcionários
@@ -1050,6 +1083,13 @@
         async function fetchTableData(tableName, dataKey) {
             if (!userProfile) return;
 
+            // Funcionários sempre em ordem alfabética: formulário de lançamento, modelo
+            // de importação, filtros e cadastro usam esta mesma lista.
+            const toAppRows = (rows) => {
+                const mapped = (rows || []).map(fromDB);
+                return tableName === 'employees' ? sortEmployeesByName(mapped) : mapped;
+            };
+
             // Busca inicial. Para gestores, a visibilidade é controlada pela RLS
             // (registros do próprio gestor + registros do mesmo setor), sem filtro explícito.
             let qb = supabase.from(tableName).select('*');
@@ -1062,7 +1102,7 @@
                 return;
             }
 
-            globalData[dataKey] = (data || []).map(fromDB);
+            globalData[dataKey] = toAppRows(data);
 
             // Configura listener de tempo real. RLS controla a visibilidade;
             // sem filtro no canal para não perder eventos de colegas do mesmo setor.
@@ -1076,7 +1116,7 @@
 
                     const { data: fresh } = await rq;
                     if (fresh) {
-                        globalData[dataKey] = fresh.map(fromDB);
+                        globalData[dataKey] = toAppRows(fresh);
                         selectedRecordIds.forEach(id => {
                             if (!fresh.some(item => item.id === id)) selectedRecordIds.delete(id);
                         });
@@ -2825,7 +2865,7 @@
                     const endDate = new Date(filterState.creationDateEnd + 'T23:59:59');
                     data = data.filter(r => r.createdAt?.toDate?.() <= endDate);
                 }
-                return data;
+                return sortRecords(data, filterState.sortBy);
             };
 
             applyFilters = () => {
@@ -2853,7 +2893,7 @@
                     creationDateStart: '',
                     creationDateEnd: ''
                 };
-                document.querySelectorAll('#filters-container .filter-input').forEach(input => input.value = '');
+                document.querySelectorAll('#filters-container .filter-input:not(#filter-sort)').forEach(input => input.value = '');
                 applyFilters();
             };
 
@@ -2881,11 +2921,17 @@
                     </div>
 
                     <div id="filters-container" class="filter-wrapper space-y-4">
-                        <div class="filter-group">
-                            <label for="filter-search" class="filter-label">Busca Rápida</label>
-                            <div class="relative">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                                <input type="text" id="filter-search" class="filter-input pl-8" placeholder="Nome, evento, observações..." value="${filterState.searchTerm}">
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <div class="filter-group flex-1">
+                                <label for="filter-search" class="filter-label">Busca Rápida</label>
+                                <div class="relative">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                    <input type="text" id="filter-search" class="filter-input pl-8" placeholder="Nome, evento, observações..." value="${filterState.searchTerm}">
+                                </div>
+                            </div>
+                            <div class="filter-group sm:w-60">
+                                <label for="filter-sort" class="filter-label">Ordenar por</label>
+                                <select id="filter-sort" class="filter-input">${recordSortOptionsHtml(filterState.sortBy)}</select>
                             </div>
                         </div>
                         <details class="filter-toggle w-full" open>
@@ -3550,7 +3596,8 @@
 
                 const archivedRows = (archivedRaw || []).map(fromDB).map(r => ({ ...r, _status: 'Arquivado', _archivedAt: r.archivedAt }));
 
-                const all = [...activeRows, ...archivedRows];
+                // Por funcionário (A–Z) e data do evento, para facilitar a conferência do DP
+                const all = sortRecords([...activeRows, ...archivedRows], 'employee');
                 if (all.length === 0) { showNotification('Não há registros para exportar.', 'info'); return; }
 
                 const sheet = all.map(r => ({
@@ -3736,7 +3783,8 @@
                     notes: '', sector: '', managerName: '',
                     eventDateStart: '', eventDateEnd: '',
                     creationDateStart: '', creationDateEnd: '',
-                    batchId: ''
+                    batchId: '',
+                    sortBy: 'recent'
                 };
                 const hgFilterIdMap = {
                     'hg-filter-search': 'searchTerm',
@@ -3751,6 +3799,7 @@
                     'hg-filter-creation-date-start': 'creationDateStart',
                     'hg-filter-creation-date-end': 'creationDateEnd',
                     'hg-batch-select': 'batchId',
+                    'hg-filter-sort': 'sortBy',
                 };
 
                 const getFilteredArchived = () => {
@@ -3800,7 +3849,7 @@
                         const end = new Date(hgFilterState.creationDateEnd + 'T23:59:59');
                         data = data.filter(r => r.createdAt?.toDate?.() <= end);
                     }
-                    return data;
+                    return sortRecords(data, hgFilterState.sortBy);
                 };
 
                 const renderContent = () => {
@@ -3819,8 +3868,9 @@
                 };
 
                 const clearHgFilters = () => {
-                    Object.keys(hgFilterState).forEach(k => { hgFilterState[k] = ''; });
-                    document.querySelectorAll('#hg-filters-container .filter-input, #hg-batch-select').forEach(el => { el.value = ''; });
+                    // A ordenação não é filtro: mantém a escolha do usuário
+                    Object.keys(hgFilterState).forEach(k => { if (k !== 'sortBy') hgFilterState[k] = ''; });
+                    document.querySelectorAll('#hg-filters-container .filter-input:not(#hg-filter-sort), #hg-batch-select').forEach(el => { el.value = ''; });
                     renderContent();
                 };
 
@@ -3852,11 +3902,17 @@
                         </div>
 
                         <div id="hg-filters-container" class="filter-wrapper space-y-4">
-                            <div class="filter-group">
-                                <label for="hg-filter-search" class="filter-label">Busca Rápida</label>
-                                <div class="relative">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                                    <input type="text" id="hg-filter-search" class="filter-input pl-8" placeholder="Nome, evento, observações..." value="${hgFilterState.searchTerm}">
+                            <div class="flex flex-col sm:flex-row gap-3">
+                                <div class="filter-group flex-1">
+                                    <label for="hg-filter-search" class="filter-label">Busca Rápida</label>
+                                    <div class="relative">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                        <input type="text" id="hg-filter-search" class="filter-input pl-8" placeholder="Nome, evento, observações..." value="${hgFilterState.searchTerm}">
+                                    </div>
+                                </div>
+                                <div class="filter-group sm:w-60">
+                                    <label for="hg-filter-sort" class="filter-label">Ordenar por</label>
+                                    <select id="hg-filter-sort" class="filter-input">${recordSortOptionsHtml(hgFilterState.sortBy)}</select>
                                 </div>
                             </div>
                             <details class="filter-toggle w-full" open>
@@ -5643,7 +5699,7 @@
                 }
             }
             const { data: updatedEmps } = await supabase.from('employees').select('*').order('name');
-            if (updatedEmps) globalData.employees = updatedEmps.map(fromDB);
+            if (updatedEmps) globalData.employees = sortEmployeesByName(updatedEmps.map(fromDB));
             if (statusArea) {
                 const sectorNote = sectorsCreated > 0 ? ` (${sectorsCreated} departamento(s) criados automaticamente)` : '';
                 summaryText.textContent = `Concluído: ${added} adicionados, ${updated} atualizados, ${skipped} ignorados.${sectorNote}`;
