@@ -141,8 +141,22 @@ CREATE TABLE IF NOT EXISTS public.records (
   sector            text,
   manager_id        uuid        REFERENCES auth.users(id),
   manager_name      text,
-  created_at        timestamptz DEFAULT now()
+  created_at        timestamptz DEFAULT now(),
+  -- Log do lançamento: original do gestor × resultado das regras
+  qm_type_input            text,     -- Tipo QM informado pelo gestor (A/B; NULL = em branco na planilha)
+  qm_type_applied          text,     -- Grau usado no cálculo, após checar a habilitação do funcionário
+  qm_rule                  text,     -- 'Fim de semana' | 'Após 21h' | 'Dia útil antes das 21h'
+  employee_grade_a_enabled boolean,  -- funcionário habilitado para Grau A no momento do lançamento
+  input_source             text      -- 'manual' | 'importacao'
 );
+
+-- Migração idempotente para bancos já existentes
+ALTER TABLE public.records
+  ADD COLUMN IF NOT EXISTS qm_type_input            text,
+  ADD COLUMN IF NOT EXISTS qm_type_applied          text,
+  ADD COLUMN IF NOT EXISTS qm_rule                  text,
+  ADD COLUMN IF NOT EXISTS employee_grade_a_enabled boolean,
+  ADD COLUMN IF NOT EXISTS input_source             text;
 
 CREATE TABLE IF NOT EXISTS public.users_profile (
   id          uuid        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -314,8 +328,21 @@ CREATE TABLE IF NOT EXISTS public.archived_records (
   sector            text,
   manager_id        uuid        REFERENCES auth.users(id),
   manager_name      text,
-  created_at        timestamptz DEFAULT now()
+  created_at        timestamptz DEFAULT now(),
+  -- Log do lançamento (mesmas colunas de records)
+  qm_type_input            text,
+  qm_type_applied          text,
+  qm_rule                  text,
+  employee_grade_a_enabled boolean,
+  input_source             text
 );
+
+ALTER TABLE public.archived_records
+  ADD COLUMN IF NOT EXISTS qm_type_input            text,
+  ADD COLUMN IF NOT EXISTS qm_type_applied          text,
+  ADD COLUMN IF NOT EXISTS qm_rule                  text,
+  ADD COLUMN IF NOT EXISTS employee_grade_a_enabled boolean,
+  ADD COLUMN IF NOT EXISTS input_source             text;
 
 CREATE INDEX IF NOT EXISTS idx_archived_records_batch       ON public.archived_records(archive_batch_id);
 CREATE INDEX IF NOT EXISTS idx_archived_records_archived_at ON public.archived_records(archived_at DESC);

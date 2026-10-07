@@ -304,6 +304,23 @@ O sistema calcula automaticamente a classificação e o valor QM com base em tr�
 > **Exemplo:** Evento no sábado às 16:00 com Tipo QM = B → **Classificação B, R$ 200**
 > **Exemplo:** Evento na quarta-feira às 21:00 com Tipo QM = A → **Classificação A, R$ 400** (21:00 inclusive conta como noturno)
 
+### Log do lançamento (original × resultado)
+
+Cada registro guarda o que o gestor lançou ao lado do que as regras produziram. No Histórico e no Arquivamento, abaixo do badge do QM aparece **"Lançado A"** / **"Lançado B"** (passe o mouse para ver todos os detalhes). Quando o grau informado é trocado pela habilitação do funcionário (ex.: "A" na planilha para funcionário só Grau B), aparece em destaque **"Lançado A → B"**.
+
+As exportações (CSV/XLSX do Histórico, Arquivamento e Base Consolidada) trazem as colunas:
+
+| Coluna | Conteúdo |
+|---|---|
+| QM Lançado (Gestor) | Tipo QM informado pelo gestor (A, B ou "Em branco" na planilha) |
+| Grau Aplicado | Grau usado no cálculo, após checar a habilitação do funcionário |
+| Regra Aplicada | Fim de semana / Após 21h / Dia útil antes das 21h |
+| QM | Classificação final (A/B/C/D) |
+| Func. Habilitado Grau A | Se o funcionário podia usar Grau A no momento do lançamento |
+| Origem Lançamento | Manual ou Importação |
+
+Registros criados antes desta funcionalidade aparecem como **"Sem log"**.
+
 ---
 
 ## 15. Dúvidas Frequentes

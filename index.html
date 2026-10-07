@@ -671,11 +671,96 @@
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
             const [hours, minutes] = gameTime.split(':').map(Number);
             const isAfter21 = hours >= 21; // 21:00 inclusive = A/B
+            // rule: motivo da conversão, gravado no log do lançamento
+            const rule = isWeekend ? 'Fim de semana' : (isAfter21 ? 'Após 21h' : 'Dia útil antes das 21h');
             if (isWeekend || isAfter21) {
-                return qmType === 'A' ? { classification: 'A', value: 400 } : { classification: 'B', value: 200 };
+                return qmType === 'A' ? { classification: 'A', value: 400, rule } : { classification: 'B', value: 200, rule };
             } else {
-                return qmType === 'A' ? { classification: 'C', value: 200 } : { classification: 'D', value: 100 };
+                return qmType === 'A' ? { classification: 'C', value: 200, rule } : { classification: 'D', value: 100, rule };
             }
+        }
+
+        // --- Log do lançamento de QM ---
+        // Guarda o que o gestor informou (Tipo QM original) ao lado do que as regras produziram,
+        // para auditar casos em que o QM foi lançado de forma incorreta.
+        //   qm_type_input            → Tipo QM informado pelo gestor (A/B; null = em branco na planilha)
+        //   qm_type_applied          → Grau usado no cálculo, após checar a habilitação do funcionário
+        //   qm_rule                  → regra de dia/horário que definiu a classificação final
+        //   employee_grade_a_enabled → se o funcionário podia usar Grau A no momento do lançamento
+        //   input_source             → 'manual' ou 'importacao'
+        const QM_AUDIT_DB_COLUMNS = ['qm_type_input', 'qm_type_applied', 'qm_rule', 'employee_grade_a_enabled', 'input_source'];
+
+        function buildQMAudit({ requested, applied, canUseGradeA, source, qmResult }) {
+            return {
+                qmTypeInput: requested || null,
+                qmTypeApplied: applied,
+                qmRule: qmResult.rule,
+                employeeGradeAEnabled: !!canUseGradeA,
+                inputSource: source,
+            };
+        }
+
+        // Copia os campos de log de uma linha do banco apenas se existirem (banco já migrado).
+        function pickQMAuditColumns(row) {
+            const out = {};
+            QM_AUDIT_DB_COLUMNS.forEach(c => { if (row && c in row) out[c] = row[c]; });
+            return out;
+        }
+
+        // Textos do log para tela e exportações. Registros anteriores ao log não têm input_source.
+        function qmAuditInfo(r) {
+            const hasLog = !!r.inputSource;
+            const input = !hasLog ? 'Sem log' : (r.qmTypeInput || 'Em branco');
+            const applied = r.qmTypeApplied || '';
+            const enabled = !hasLog ? '' : (r.employeeGradeAEnabled ? 'Sim' : 'Não');
+            const source = !hasLog ? '' : (r.inputSource === 'importacao' ? 'Importação' : 'Manual');
+            const rule = r.qmRule || '';
+            // Grau informado foi trocado pela habilitação (ex.: A pedido p/ funcionário só Grau B)
+            const gradeChanged = hasLog && applied && (r.qmTypeInput || 'B') !== applied;
+            return { hasLog, input, applied, enabled, source, rule, gradeChanged };
+        }
+
+        function qmAuditExportColumns(r) {
+            const a = qmAuditInfo(r);
+            return {
+                "QM Lançado (Gestor)": a.input,
+                "Grau Aplicado": a.applied || '-',
+                "Regra Aplicada": a.rule || '-',
+                "Func. Habilitado Grau A": a.enabled || '-',
+                "Origem Lançamento": a.source || '-',
+            };
+        }
+
+        // Linha pequena sob o badge de QM: "Lançado A" (ou "Lançado A → B" se a habilitação trocou o grau); detalhes no tooltip
+        function qmAuditSubline(r) {
+            const a = qmAuditInfo(r);
+            if (!a.hasLog) return '';
+            const title = `Lançado pelo gestor: ${a.input} | Grau aplicado: ${a.applied || '-'} | Regra: ${a.rule || '-'} | QM final: ${r.qmClassification || '-'} | Habilitado Grau A: ${a.enabled} | Origem: ${a.source}`;
+            const color = a.gradeChanged ? 'color:#b45309;font-weight:600' : 'color:#94a3b8';
+            return `<p style="font-size:10px;margin-top:3px;${color}" title="${title}">Lançado ${a.input}${a.gradeChanged ? ' → ' + a.applied : ''}</p>`;
+        }
+
+        let qmAuditMigrationWarned = false;
+        function isMissingQMAuditColumnError(err) {
+            const msg = String(err?.message || '');
+            return QM_AUDIT_DB_COLUMNS.some(c => msg.includes(c));
+        }
+
+        // Insere em records gravando o log; se o banco ainda não tiver as colunas novas
+        // (migração 2026-10-07 não executada), grava sem o log para não travar o lançamento.
+        async function insertRecordWithQMAudit(row) {
+            const { error } = await supabase.from('records').insert(row);
+            if (!error || !isMissingQMAuditColumnError(error)) return { error };
+            if (!qmAuditMigrationWarned) {
+                qmAuditMigrationWarned = true;
+                console.warn('[QM log] Colunas de log ausentes no banco. Execute migrations/2026-10-07_qm_input_log.sql.', error);
+                if (userProfile?.isAdmin) {
+                    showNotification('Log do QM não gravado: execute a migração 2026-10-07_qm_input_log.sql no Supabase.', 'error', 8000);
+                }
+            }
+            const stripped = { ...row };
+            QM_AUDIT_DB_COLUMNS.forEach(c => delete stripped[c]);
+            return await supabase.from('records').insert(stripped);
         }
 
         const appHeader = document.getElementById('app-header');
@@ -1332,7 +1417,7 @@
                     managerName: userProfile.name,
                     sector: resolvedSector,
                 });
-                const { error } = await supabase.from('records').insert(dataToSave);
+                const { error } = await insertRecordWithQMAudit(dataToSave);
                 if (error) throw error;
                 return { success: true };
             } catch (error) {
@@ -2240,7 +2325,14 @@
                     employeeId,
                     employeeName,
                     notes,
-                    sector: recordSector
+                    sector: recordSector,
+                    ...buildQMAudit({
+                        requested: qmType,
+                        applied: qmType,
+                        canUseGradeA: !!employee?.canUseGradeA,
+                        source: 'manual',
+                        qmResult,
+                    }),
                 };
 
                 // Validação de duplicidade
@@ -2615,6 +2707,13 @@
                                 employeeId,
                                 employeeName: finalEmployeeName,
                                 notes,
+                                ...buildQMAudit({
+                                    requested: requestedGrade,
+                                    applied: qmType,
+                                    canUseGradeA,
+                                    source: 'importacao',
+                                    qmResult,
+                                }),
                             };
 
                             // Check for duplicates in existing records
@@ -2768,6 +2867,7 @@
                         <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px;max-width:140px;overflow:hidden;text-overflow:ellipsis">${record.gameCategory || record.categoryName || 'N/A'}</td>
                         <td class="whitespace-nowrap text-center" style="padding:10px 16px">
                             ${qmBadge(record.qmClassification)}
+                            ${qmAuditSubline(record)}
                         </td>
                         <td class="text-xs text-slate-700 font-medium whitespace-nowrap" style="padding:10px 16px">${record.employeeName || 'N/A'}</td>
                         <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${record.sector || '-'}</td>
@@ -3354,6 +3454,7 @@
                 manager_id: arch.manager_id,
                 manager_name: arch.manager_name,
                 created_at: arch.created_at,
+                ...pickQMAuditColumns(arch),
             };
             if (arch.original_id) insertRow.id = arch.original_id;
 
@@ -3431,6 +3532,7 @@
                     manager_id: r.manager_id,
                     manager_name: r.manager_name,
                     created_at: r.created_at,
+                    ...pickQMAuditColumns(r),
                 }));
 
                 for (let i = 0; i < toInsert.length; i += batchSize) {
@@ -3611,6 +3713,7 @@
                     "Cat. Jogo": r.gameCategory || '-',
                     "QM": r.qmClassification || '-',
                     "Valor QM": Number(r.qmValue) || 0,
+                    ...qmAuditExportColumns(r),
                     "Chapa": globalData.employees.find(e => e.id === r.employeeId)?.registration || '-',
                     "Funcionário": r.employeeName || 'N/A',
                     "Setor": r.sector || '-',
@@ -3698,7 +3801,7 @@
                                 <p class="text-xs text-slate-500">${r.eventDate?new Date(r.eventDate+'T00:00:00').toLocaleDateString('pt-BR'):'N/A'}${r.gameTime?' · '+r.gameTime:''}</p>
                             </td>
                             <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px;max-width:140px;overflow:hidden;text-overflow:ellipsis">${r.gameCategory||'N/A'}</td>
-                            <td class="whitespace-nowrap text-center" style="padding:10px 16px">${qmBadge(r.qmClassification)}</td>
+                            <td class="whitespace-nowrap text-center" style="padding:10px 16px">${qmBadge(r.qmClassification)}${qmAuditSubline(r)}</td>
                             <td class="text-xs text-slate-700 font-medium whitespace-nowrap" style="padding:10px 16px">${r.employeeName||'N/A'}</td>
                             <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${r.sector||'-'}</td>
                             <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${r.managerName||'-'}</td>
@@ -4029,6 +4132,7 @@
                         "Horário": r.gameTime||'-',
                         "Cat. Jogo": r.gameCategory||'N/A',
                         "QM": r.qmClassification||'-',
+                        ...qmAuditExportColumns(r),
                         "Chapa": globalData.employees.find(e=>e.id===r.employeeId)?.registration||'-',
                         "Funcionário": r.employeeName||'N/A',
                         "Setor": r.sector||'N/A',
@@ -5488,7 +5592,7 @@
             if (!records || records.length === 0) {
                 showNotification("Nenhum dado para exportar.", "info"); return;
             }
-            const headers = ["Data Criação", "Evento", "Data Evento", "Horário", "Cat. Jogo", "QM", "Valor QM", "Chapa", "Funcionário", "Setor", "Gestor Lançador", "Observações"];
+            const headers = ["Data Criação", "Evento", "Data Evento", "Horário", "Cat. Jogo", "QM", "Valor QM", "QM Lançado (Gestor)", "Grau Aplicado", "Regra Aplicada", "Func. Habilitado Grau A", "Origem Lançamento", "Chapa", "Funcionário", "Setor", "Gestor Lançador", "Observações"];
             let csvContent = headers.join(",") + "\\n";
 
             records.forEach(record => {
@@ -5501,6 +5605,7 @@
                     `"${(record.gameCategory || record.categoryName || 'N/A').replace(/"/g, '""')}"`,
                     record.qmClassification || '-',
                     record.qmValue ? `R$ ${record.qmValue}` : '-',
+                    ...(a => [a.input, a.applied || '-', a.rule || '-', a.enabled || '-', a.source || '-'])(qmAuditInfo(record)),
                     `"${empChapa}"`,
                     `"${(record.employeeName || 'N/A').replace(/"/g, '""')}"`,
                     `"${(record.sector || 'N/A').replace(/"/g, '""')}"`,
@@ -5540,6 +5645,7 @@
                     "Horário": record.gameTime || '-',
                     "Cat. Jogo": record.gameCategory || record.categoryName || 'N/A',
                     "QM": record.qmClassification || '-',
+                    ...qmAuditExportColumns(record),
                     "Chapa": empChapa,
                     "Funcionário": record.employeeName || 'N/A',
                     "Setor": record.sector || 'N/A',
