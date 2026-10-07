@@ -712,6 +712,19 @@
             return { A: 'A', C: 'A', B: 'B', D: 'B' }[classification] || '';
         }
 
+        // Desde 20/07/2026 o sistema só aceita Grau A para funcionário habilitado (form manual trava em B;
+        // importação rebaixa ou ignora o A). Logo, um registro criado depois disso com QM A ou C prova que
+        // o funcionário estava habilitado para Grau A no momento do lançamento.
+        const GRADE_A_GATE_SINCE = '2026-07-21';
+
+        // O log do QM (lançado × final, deduções) é ferramenta de auditoria: só o admin vê.
+        const canSeeQMAudit = () => !!userProfile?.isAdmin;
+
+        function recordCreatedDay(r) {
+            const raw = r.createdAt?.toString?.() || r.created_at || '';
+            return String(raw).slice(0, 10);
+        }
+
         // Textos do log para tela e exportações. Registros anteriores ao log não têm input_source:
         // para eles o grau e a regra são deduzidos da classificação + data/horário ("deduzido").
         function qmAuditInfo(r) {
@@ -720,7 +733,9 @@
                 const deduced = deduceQMGrade(r.qmClassification);
                 const rule = (deduced && r.eventDate && r.gameTime)
                     ? computeQMClassification(deduced, r.eventDate, r.gameTime).rule : '';
-                return { hasLog, deduced: !!deduced, input: deduced ? `${deduced} (deduzido)` : 'Sem log', applied: deduced, enabled: '', source: '', rule, gradeChanged: false };
+                const created = recordCreatedDay(r);
+                const enabled = (deduced === 'A' && created >= GRADE_A_GATE_SINCE) ? 'Sim (deduzido)' : '';
+                return { hasLog, deduced: !!deduced, input: deduced ? `${deduced} (deduzido)` : 'Sem log', applied: deduced, enabled, source: '', rule, gradeChanged: false };
             }
             const input = r.qmTypeInput || 'Em branco';
             const applied = r.qmTypeApplied || '';
@@ -733,6 +748,7 @@
         }
 
         function qmAuditExportColumns(r) {
+            if (!canSeeQMAudit()) return {};
             const a = qmAuditInfo(r);
             return {
                 "QM Lançado (Gestor)": a.input,
@@ -745,10 +761,11 @@
 
         // Linha pequena sob o badge de QM: "Lançado A" (ou "Lançado A → B" se a habilitação trocou o grau); detalhes no tooltip
         function qmAuditSubline(r) {
+            if (!canSeeQMAudit()) return '';
             const a = qmAuditInfo(r);
             if (!a.hasLog) {
                 if (!a.deduced) return '';
-                return `<p style="font-size:10px;margin-top:3px;color:#94a3b8" title="Registro anterior ao log: grau deduzido da classificação final | Regra: ${a.rule || '-'} | QM final: ${r.qmClassification || '-'}">Lançado ${a.input}</p>`;
+                return `<p style="font-size:10px;margin-top:3px;color:#94a3b8" title="Registro anterior ao log: grau deduzido da classificação final | Regra: ${a.rule || '-'} | QM final: ${r.qmClassification || '-'}${a.enabled ? ' | Habilitado Grau A: ' + a.enabled : ''}">Lançado ${a.input}</p>`;
             }
             const title =`Lançado pelo gestor: ${a.input} | Grau aplicado: ${a.applied || '-'} | Regra: ${a.rule || '-'} | QM final: ${r.qmClassification || '-'} | Habilitado Grau A: ${a.enabled} | Origem: ${a.source}`;
             const color = a.gradeChanged ? 'color:#b45309;font-weight:600' : 'color:#94a3b8';
@@ -3801,7 +3818,8 @@
                 `lançado ${a.input}`,
             ];
             if (a.rule) parts.push(`regra: ${a.rule}`);
-            if (a.hasLog) parts.push(`habilitado Grau A: ${a.enabled}`, `origem: ${a.source}`);
+            if (a.enabled) parts.push(`habilitado Grau A: ${a.enabled}`);
+            if (a.source) parts.push(`origem: ${a.source}`);
             if (r.sector) parts.push(`setor: ${r.sector}`);
             return parts.join(' · ');
         }
@@ -3856,6 +3874,39 @@
             return e.source === 'reconstruido' ? 'Não registrado' : 'Sistema / SQL';
         }
 
+        // Reconstrói o histórico a partir dos dados atuais, sem depender da tabela audit_log.
+        // Usado enquanto a migração do log não foi executada no banco (mesma lógica do backfill SQL).
+        async function buildReconstructedAuditLog() {
+            const tables = ['employees', 'records', 'archived_records', 'users_profile', 'sectors', 'categories', 'rules'];
+            const [emps, recs, archs, users, secs, cats, rules] = await Promise.all(tables.map(t =>
+                fetchAllPages(t).catch(err => { console.warn(`[auditoria] não foi possível ler ${t}:`, err); return []; })));
+            const userById = new Map(users.map(u => [u.id, u]));
+            const out = [];
+            const add = (occurredAt, actorId, fallbackName, table, action, rowId, data, asOld = false) => {
+                const u = actorId ? userById.get(actorId) : null;
+                out.push({
+                    occurred_at: occurredAt || null, actor_id: actorId || null,
+                    actor_name: u?.name || fallbackName || null, actor_email: u?.email || null,
+                    table_name: table, action, row_id: rowId,
+                    new_data: asOld ? null : data, old_data: asOld ? data : null,
+                    changed_fields: null, source: 'reconstruido',
+                });
+            };
+            emps.forEach(e => add(e.created_at, e.created_by, null, 'employees', 'INSERT', e.id, e));
+            secs.forEach(x => add(x.created_at, x.created_by, null, 'sectors', 'INSERT', x.id, x));
+            cats.forEach(x => add(x.created_at, x.created_by, null, 'categories', 'INSERT', x.id, x));
+            rules.forEach(x => add(x.created_at, x.created_by, null, 'rules', 'INSERT', x.id, x));
+            users.forEach(u => add(u.created_at, null, null, 'users_profile', 'INSERT', u.id, u));
+            recs.forEach(r => add(r.created_at, r.manager_id, r.manager_name, 'records', 'INSERT', r.id, r));
+            archs.forEach(a => {
+                const rowId = a.original_id || a.id;
+                add(a.created_at, a.manager_id, a.manager_name, 'records', 'INSERT', rowId, a);
+                add(a.archived_at, a.archived_by, null, 'records', 'ARCHIVE', rowId, a, true);
+            });
+            const ms = (e) => e.occurred_at ? new Date(e.occurred_at).getTime() : 0;
+            return out.sort((a, b) => ms(b) - ms(a));
+        }
+
         async function renderAuditLogPage() {
             if (!userProfile?.isAdmin) { currentView = 'login'; renderApp(); return; }
             const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -3884,18 +3935,21 @@
             `;
             document.getElementById('btn-audit-back').onclick = () => { currentView = 'adminDashboard'; renderApp(); };
 
-            let entries;
+            let raw;
+            let autoLogActive = true;
             try {
-                const raw = await fetchAllPages('audit_log', q => q.order('occurred_at', { ascending: false }).order('id', { ascending: false }));
-                entries = raw.map(e => ({ ...e, ...describeAuditEntry(e), actor: auditActorLabel(e), typeLabel: AUDIT_TABLE_LABELS[e.table_name] || e.table_name }));
+                raw = await fetchAllPages('audit_log', q => q.order('occurred_at', { ascending: false }).order('id', { ascending: false }));
             } catch (err) {
-                console.error('[renderAuditLogPage]', err);
-                const missing = /audit_log/.test(String(err?.message || ''));
-                document.getElementById('audit-content').innerHTML = `<p style="font-size:13px;color:#b91c1c">${missing
-                    ? 'O log de auditoria ainda não foi ativado. Execute <strong>migrations/2026-10-07_audit_log.sql</strong> no SQL Editor do Supabase.'
-                    : 'Erro ao carregar o log: ' + esc(err?.message || err)}</p>`;
-                return;
+                if (!/audit_log/.test(String(err?.message || ''))) {
+                    console.error('[renderAuditLogPage]', err);
+                    document.getElementById('audit-content').innerHTML = `<p style="font-size:13px;color:#b91c1c">Erro ao carregar o log: ${esc(err?.message || err)}</p>`;
+                    return;
+                }
+                // Tabela audit_log ainda não existe: mostra o histórico reconstruído dos dados atuais
+                autoLogActive = false;
+                raw = await buildReconstructedAuditLog();
             }
+            const entries = raw.map(e => ({ ...e, ...describeAuditEntry(e), actor: auditActorLabel(e), typeLabel: AUDIT_TABLE_LABELS[e.table_name] || e.table_name }));
 
             const uniq = (arr) => [...new Set(arr.filter(Boolean))].sort(compareNames);
             const actors = uniq(entries.map(e => e.actor));
@@ -3907,11 +3961,18 @@
             const content = document.getElementById('audit-content');
             content.className = 'exec-card p-5';
             content.innerHTML = `
+                ${autoLogActive ? '' : `<div style="font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;margin-bottom:10px;line-height:1.5">
+                    <strong>Registro automático ainda não ativado.</strong> Abaixo está o histórico reconstruído a partir dos dados atuais.
+                    Para que novas alterações (ex.: habilitar Grau A, excluir lançamento) passem a ser gravadas com autor e data,
+                    quem administra o projeto no Supabase precisa executar <strong>migrations/2026-10-07_audit_log.sql</strong>.
+                </div>`}
                 <div style="font-size:12px;color:var(--ink-2);background:var(--bg-alt);border-radius:10px;padding:10px 14px;margin-bottom:14px;line-height:1.5">
                     <strong>Registrado no momento</strong>: gravado pelo banco quando a ação aconteceu (usuário e valores antes/depois).
                     <strong>Reconstruído</strong>: montado a partir dos dados que já existiam antes do log (quem cadastrou, quem lançou, quem arquivou).
                     Alterações anteriores ao log — como quem marcou "Pode Grau A" — e registros excluídos antes dele não ficaram gravados.
                     "Lançado A (deduzido)" = grau deduzido da classificação final (A/C ⇒ A, B/D ⇒ B).
+                    Desde 20/07/2026 o sistema só aceita Grau A para funcionário habilitado: um QM A ou C lançado depois disso
+                    indica que o funcionário estava habilitado naquele momento ("habilitado Grau A: Sim (deduzido)").
                 </div>
                 <div class="flex flex-wrap gap-2 items-end" style="margin-bottom:14px">
                     <input id="audit-f-search" type="text" placeholder="Buscar (funcionário, evento, detalhe...)" class="${inp}" style="min-width:240px;flex:1">
@@ -3928,9 +3989,9 @@
             `;
 
             let filtered = entries;
-            const fmtWhen = (iso) => new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+            const fmtWhen = (iso) => iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A';
             const sourceLabel = (e) => e.source === 'reconstruido' ? 'Reconstruído' : 'Registrado no momento';
-            const localDay = (iso) => { const dt = new Date(iso); return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`; };
+            const localDay = (iso) => { if (!iso) return ''; const dt = new Date(iso); return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`; };
 
             const apply = () => {
                 const val = (id) => document.getElementById(id).value;
@@ -5848,7 +5909,8 @@
             if (!records || records.length === 0) {
                 showNotification("Nenhum dado para exportar.", "info"); return;
             }
-            const headers = ["Data Criação", "Evento", "Data Evento", "Horário", "Cat. Jogo", "QM", "Valor QM", "QM Lançado (Gestor)", "Grau Aplicado", "Regra Aplicada", "Func. Habilitado Grau A", "Origem Lançamento", "Chapa", "Funcionário", "Setor", "Gestor Lançador", "Observações"];
+            const showAudit = canSeeQMAudit();
+            const headers = ["Data Criação", "Evento", "Data Evento", "Horário", "Cat. Jogo", "QM", "Valor QM", ...(showAudit ? ["QM Lançado (Gestor)", "Grau Aplicado", "Regra Aplicada", "Func. Habilitado Grau A", "Origem Lançamento"] : []), "Chapa", "Funcionário", "Setor", "Gestor Lançador", "Observações"];
             let csvContent = headers.join(",") + "\\n";
 
             records.forEach(record => {
@@ -5861,7 +5923,7 @@
                     `"${(record.gameCategory || record.categoryName || 'N/A').replace(/"/g, '""')}"`,
                     record.qmClassification || '-',
                     record.qmValue ? `R$ ${record.qmValue}` : '-',
-                    ...(a => [a.input, a.applied || '-', a.rule || '-', a.enabled || '-', a.source || '-'])(qmAuditInfo(record)),
+                    ...(showAudit ? (a => [a.input, a.applied || '-', a.rule || '-', a.enabled || '-', a.source || '-'])(qmAuditInfo(record)) : []),
                     `"${empChapa}"`,
                     `"${(record.employeeName || 'N/A').replace(/"/g, '""')}"`,
                     `"${(record.sector || 'N/A').replace(/"/g, '""')}"`,

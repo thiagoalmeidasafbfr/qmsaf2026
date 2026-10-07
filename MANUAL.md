@@ -306,7 +306,7 @@ O sistema calcula automaticamente a classificação e o valor QM com base em tr�
 
 ### Log do lançamento (original × resultado)
 
-Cada registro guarda o que o gestor lançou ao lado do que as regras produziram. No Histórico e no Arquivamento, abaixo do badge do QM aparece **"Lançado A"** / **"Lançado B"** (passe o mouse para ver todos os detalhes). Quando o grau informado é trocado pela habilitação do funcionário (ex.: "A" na planilha para funcionário só Grau B), aparece em destaque **"Lançado A → B"**.
+Cada registro guarda o que o gestor lançou ao lado do que as regras produziram. **Visível somente para administradores** (gestores não veem essas informações na tela nem nas exportações). No Histórico e no Arquivamento, abaixo do badge do QM aparece **"Lançado A"** / **"Lançado B"** (passe o mouse para ver todos os detalhes). Quando o grau informado é trocado pela habilitação do funcionário (ex.: "A" na planilha para funcionário só Grau B), aparece em destaque **"Lançado A → B"**.
 
 As exportações (CSV/XLSX do Histórico, Arquivamento e Base Consolidada) trazem as colunas:
 
@@ -328,7 +328,9 @@ No painel do admin, **Log de Auditoria** mostra quem fez cada ação e quando: l
 - **Registrado no momento**: gravado pelo próprio banco no instante da ação. Não pode ser editado nem apagado pela aplicação.
 - **Reconstruído**: montado a partir dos dados existentes quando o log foi ativado (quem cadastrou cada funcionário, quem lançou cada QM, quem arquivou). Alterações feitas antes do log — como quem marcou "Pode Grau A" — e registros já excluídos não podem ser reconstruídos.
 
-Para ativar, o admin executa `migrations/2026-10-07_qm_input_log.sql` e `migrations/2026-10-07_audit_log.sql` no SQL Editor do Supabase.
+Desde 20/07/2026 o sistema só aceita Grau A para funcionário habilitado; por isso, um QM A ou C lançado depois dessa data aparece com **"habilitado Grau A: Sim (deduzido)"** — o funcionário estava habilitado no momento do lançamento.
+
+Enquanto a migração não for executada, a tela mostra o histórico reconstruído a partir dos dados atuais. Para que novas alterações passem a ser gravadas, quem administra o projeto no Supabase executa `migrations/2026-10-07_qm_input_log.sql` e `migrations/2026-10-07_audit_log.sql` no SQL Editor do Supabase.
 
 ---
 
