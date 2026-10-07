@@ -1239,7 +1239,8 @@
                         });
                         updateSelectedCountUI();
                         if (currentView === 'history') applyFilters();
-                        else renderApp();
+                        // Não redesenha formulários em preenchimento: apagaria o que o gestor já digitou
+                        else if (currentView !== 'newRecord' && currentView !== 'importRecords') renderApp();
                     }
                 })
                 .subscribe();
@@ -2264,6 +2265,13 @@
             });
 
             // Controle do Grau A: só habilita seleção A/B se o funcionário permitir; senão trava em B.
+            // gradePickedByUser guarda a escolha explícita do gestor: o B forçado por um funcionário
+            // não habilitado não pode "grudar" ao trocar para um funcionário habilitado, e um
+            // funcionário habilitado nunca vem com B pré-selecionado (o gestor precisa escolher).
+            let gradePickedByUser = '';
+            document.getElementById('qmType').addEventListener('change', (ev) => {
+                if (!ev.target.disabled) gradePickedByUser = ev.target.value;
+            });
             const updateGradeAvailability = () => {
                 const empSel = document.getElementById('employee');
                 const qmSel = document.getElementById('qmType');
@@ -2273,9 +2281,8 @@
                 const emp = (empId && empId !== 'OUTROS') ? globalData.employees.find(e => e.id === empId) : null;
                 const canA = !!(emp && emp.canUseGradeA);
                 if (canA) {
-                    const prev = qmSel.value;
                     qmSel.innerHTML = '<option value="">Selecione</option><option value="A">A</option><option value="B">B</option>';
-                    qmSel.value = (prev === 'A' || prev === 'B') ? prev : '';
+                    qmSel.value = (gradePickedByUser === 'A' || gradePickedByUser === 'B') ? gradePickedByUser : '';
                     qmSel.disabled = false;
                     if (hint) hint.classList.add('hidden');
                 } else {
