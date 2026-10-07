@@ -319,7 +319,16 @@ As exportações (CSV/XLSX do Histórico, Arquivamento e Base Consolidada) traze
 | Func. Habilitado Grau A | Se o funcionário podia usar Grau A no momento do lançamento |
 | Origem Lançamento | Manual ou Importação |
 
-Registros criados antes desta funcionalidade aparecem como **"Sem log"**.
+Registros criados antes desta funcionalidade aparecem como **"A (deduzido)"** / **"B (deduzido)"**: o grau é deduzido da classificação final (A ou C ⇒ Grau A; B ou D ⇒ Grau B). A dedução mostra o grau que o sistema aplicou; em importações antigas, um "A" da planilha que tenha sido rebaixado para B não pode ser recuperado.
+
+### Log de Auditoria (admin)
+
+No painel do admin, **Log de Auditoria** mostra quem fez cada ação e quando: lançamentos de QM, exclusões, arquivamentos/desarquivamentos, cadastro e alteração de funcionários (incluindo **"Habilitou Grau A" / "Desabilitou Grau A"**), usuários, setores, categorias e regras. Alterações mostram o valor antes → depois. Há filtros por usuário, tipo, ação, origem e período, e exportação XLSX.
+
+- **Registrado no momento**: gravado pelo próprio banco no instante da ação. Não pode ser editado nem apagado pela aplicação.
+- **Reconstruído**: montado a partir dos dados existentes quando o log foi ativado (quem cadastrou cada funcionário, quem lançou cada QM, quem arquivou). Alterações feitas antes do log — como quem marcou "Pode Grau A" — e registros já excluídos não podem ser reconstruídos.
+
+Para ativar, o admin executa `migrations/2026-10-07_qm_input_log.sql` e `migrations/2026-10-07_audit_log.sql` no SQL Editor do Supabase.
 
 ---
 
