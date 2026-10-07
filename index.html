@@ -671,11 +671,111 @@
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
             const [hours, minutes] = gameTime.split(':').map(Number);
             const isAfter21 = hours >= 21; // 21:00 inclusive = A/B
+            // rule: motivo da conversão, gravado no log do lançamento
+            const rule = isWeekend ? 'Fim de semana' : (isAfter21 ? 'Após 21h' : 'Dia útil antes das 21h');
             if (isWeekend || isAfter21) {
-                return qmType === 'A' ? { classification: 'A', value: 400 } : { classification: 'B', value: 200 };
+                return qmType === 'A' ? { classification: 'A', value: 400, rule } : { classification: 'B', value: 200, rule };
             } else {
-                return qmType === 'A' ? { classification: 'C', value: 200 } : { classification: 'D', value: 100 };
+                return qmType === 'A' ? { classification: 'C', value: 200, rule } : { classification: 'D', value: 100, rule };
             }
+        }
+
+        // --- Log do lançamento de QM ---
+        // Guarda o que o gestor informou (Tipo QM original) ao lado do que as regras produziram,
+        // para auditar casos em que o QM foi lançado de forma incorreta.
+        //   qm_type_input            → Tipo QM informado pelo gestor (A/B; null = em branco na planilha)
+        //   qm_type_applied          → Grau usado no cálculo, após checar a habilitação do funcionário
+        //   qm_rule                  → regra de dia/horário que definiu a classificação final
+        //   employee_grade_a_enabled → se o funcionário podia usar Grau A no momento do lançamento
+        //   input_source             → 'manual' ou 'importacao'
+        const QM_AUDIT_DB_COLUMNS = ['qm_type_input', 'qm_type_applied', 'qm_rule', 'employee_grade_a_enabled', 'input_source'];
+
+        function buildQMAudit({ requested, applied, canUseGradeA, source, qmResult }) {
+            return {
+                qmTypeInput: requested || null,
+                qmTypeApplied: applied,
+                qmRule: qmResult.rule,
+                employeeGradeAEnabled: !!canUseGradeA,
+                inputSource: source,
+            };
+        }
+
+        // Copia os campos de log de uma linha do banco apenas se existirem (banco já migrado).
+        function pickQMAuditColumns(row) {
+            const out = {};
+            QM_AUDIT_DB_COLUMNS.forEach(c => { if (row && c in row) out[c] = row[c]; });
+            return out;
+        }
+
+        // Grau usado no cálculo, deduzido da classificação final: A/C só saem do Grau A, B/D só do Grau B.
+        function deduceQMGrade(classification) {
+            return { A: 'A', C: 'A', B: 'B', D: 'B' }[classification] || '';
+        }
+
+        // Textos do log para tela e exportações. Registros anteriores ao log não têm input_source:
+        // para eles o grau e a regra são deduzidos da classificação + data/horário ("deduzido").
+        function qmAuditInfo(r) {
+            const hasLog = !!r.inputSource;
+            if (!hasLog) {
+                const deduced = deduceQMGrade(r.qmClassification);
+                const rule = (deduced && r.eventDate && r.gameTime)
+                    ? computeQMClassification(deduced, r.eventDate, r.gameTime).rule : '';
+                return { hasLog, deduced: !!deduced, input: deduced ? `${deduced} (deduzido)` : 'Sem log', applied: deduced, enabled: '', source: '', rule, gradeChanged: false };
+            }
+            const input = r.qmTypeInput || 'Em branco';
+            const applied = r.qmTypeApplied || '';
+            const enabled = r.employeeGradeAEnabled ? 'Sim' : 'Não';
+            const source = r.inputSource === 'importacao' ? 'Importação' : 'Manual';
+            const rule = r.qmRule || '';
+            // Grau informado foi trocado pela habilitação (ex.: A pedido p/ funcionário só Grau B)
+            const gradeChanged = !!applied && (r.qmTypeInput || 'B') !== applied;
+            return { hasLog, deduced: false, input, applied, enabled, source, rule, gradeChanged };
+        }
+
+        function qmAuditExportColumns(r) {
+            const a = qmAuditInfo(r);
+            return {
+                "QM Lançado (Gestor)": a.input,
+                "Grau Aplicado": a.applied || '-',
+                "Regra Aplicada": a.rule || '-',
+                "Func. Habilitado Grau A": a.enabled || '-',
+                "Origem Lançamento": a.source || '-',
+            };
+        }
+
+        // Linha pequena sob o badge de QM: "Lançado A" (ou "Lançado A → B" se a habilitação trocou o grau); detalhes no tooltip
+        function qmAuditSubline(r) {
+            const a = qmAuditInfo(r);
+            if (!a.hasLog) {
+                if (!a.deduced) return '';
+                return `<p style="font-size:10px;margin-top:3px;color:#94a3b8" title="Registro anterior ao log: grau deduzido da classificação final | Regra: ${a.rule || '-'} | QM final: ${r.qmClassification || '-'}">Lançado ${a.input}</p>`;
+            }
+            const title =`Lançado pelo gestor: ${a.input} | Grau aplicado: ${a.applied || '-'} | Regra: ${a.rule || '-'} | QM final: ${r.qmClassification || '-'} | Habilitado Grau A: ${a.enabled} | Origem: ${a.source}`;
+            const color = a.gradeChanged ? 'color:#b45309;font-weight:600' : 'color:#94a3b8';
+            return `<p style="font-size:10px;margin-top:3px;${color}" title="${title}">Lançado ${a.input}${a.gradeChanged ? ' → ' + a.applied : ''}</p>`;
+        }
+
+        let qmAuditMigrationWarned = false;
+        function isMissingQMAuditColumnError(err) {
+            const msg = String(err?.message || '');
+            return QM_AUDIT_DB_COLUMNS.some(c => msg.includes(c));
+        }
+
+        // Insere em records gravando o log; se o banco ainda não tiver as colunas novas
+        // (migração 2026-10-07 não executada), grava sem o log para não travar o lançamento.
+        async function insertRecordWithQMAudit(row) {
+            const { error } = await supabase.from('records').insert(row);
+            if (!error || !isMissingQMAuditColumnError(error)) return { error };
+            if (!qmAuditMigrationWarned) {
+                qmAuditMigrationWarned = true;
+                console.warn('[QM log] Colunas de log ausentes no banco. Execute migrations/2026-10-07_qm_input_log.sql.', error);
+                if (userProfile?.isAdmin) {
+                    showNotification('Log do QM não gravado: execute a migração 2026-10-07_qm_input_log.sql no Supabase.', 'error', 8000);
+                }
+            }
+            const stripped = { ...row };
+            QM_AUDIT_DB_COLUMNS.forEach(c => delete stripped[c]);
+            return await supabase.from('records').insert(stripped);
         }
 
         const appHeader = document.getElementById('app-header');
@@ -1332,7 +1432,7 @@
                     managerName: userProfile.name,
                     sector: resolvedSector,
                 });
-                const { error } = await supabase.from('records').insert(dataToSave);
+                const { error } = await insertRecordWithQMAudit(dataToSave);
                 if (error) throw error;
                 return { success: true };
             } catch (error) {
@@ -1544,6 +1644,7 @@
                 case 'adminCreateUserProfile': renderAdminCreateUserProfilePage(); break;
                 case 'historicoGeral': renderHistoricoGeral(); break;
                 case 'adminAnalytics': renderAnalyticsPage(); break;
+                case 'adminAuditLog': renderAuditLogPage(); break;
                 case 'archiveSelection': renderArchiveSelection(); break;
                 case 'resetPassword': renderResetPasswordPage(); break;
                 default: renderLoginPage();
@@ -2240,7 +2341,14 @@
                     employeeId,
                     employeeName,
                     notes,
-                    sector: recordSector
+                    sector: recordSector,
+                    ...buildQMAudit({
+                        requested: qmType,
+                        applied: qmType,
+                        canUseGradeA: !!employee?.canUseGradeA,
+                        source: 'manual',
+                        qmResult,
+                    }),
                 };
 
                 // Validação de duplicidade
@@ -2615,6 +2723,13 @@
                                 employeeId,
                                 employeeName: finalEmployeeName,
                                 notes,
+                                ...buildQMAudit({
+                                    requested: requestedGrade,
+                                    applied: qmType,
+                                    canUseGradeA,
+                                    source: 'importacao',
+                                    qmResult,
+                                }),
                             };
 
                             // Check for duplicates in existing records
@@ -2768,6 +2883,7 @@
                         <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px;max-width:140px;overflow:hidden;text-overflow:ellipsis">${record.gameCategory || record.categoryName || 'N/A'}</td>
                         <td class="whitespace-nowrap text-center" style="padding:10px 16px">
                             ${qmBadge(record.qmClassification)}
+                            ${qmAuditSubline(record)}
                         </td>
                         <td class="text-xs text-slate-700 font-medium whitespace-nowrap" style="padding:10px 16px">${record.employeeName || 'N/A'}</td>
                         <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${record.sector || '-'}</td>
@@ -3264,6 +3380,11 @@
                                 <p style="font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-.005em">Exportar Base Consolidada</p>
                                 <p style="font-size:12px;color:var(--ink-3);margin-top:4px">Ativos + arquivados (XLSX)</p>
                             </button>
+                            <button id="admin-btn-audit-log" class="action-card">
+                                <div class="action-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg></div>
+                                <p style="font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-.005em">Log de Auditoria</p>
+                                <p style="font-size:12px;color:var(--ink-3);margin-top:4px">Quem fez o quê e quando</p>
+                            </button>
                         </div>
                     </div>
 
@@ -3327,6 +3448,7 @@
                 currentView = 'archiveSelection'; renderApp();
             };
             document.getElementById('admin-btn-export-consolidada').onclick = exportConsolidatedBase;
+            document.getElementById('admin-btn-audit-log').onclick = () => { currentView = 'adminAuditLog'; renderApp(); };
         }
 
         // Arquiva uma seleção específica de registros: move de records → archived_records
@@ -3354,6 +3476,7 @@
                 manager_id: arch.manager_id,
                 manager_name: arch.manager_name,
                 created_at: arch.created_at,
+                ...pickQMAuditColumns(arch),
             };
             if (arch.original_id) insertRow.id = arch.original_id;
 
@@ -3431,6 +3554,7 @@
                     manager_id: r.manager_id,
                     manager_name: r.manager_name,
                     created_at: r.created_at,
+                    ...pickQMAuditColumns(r),
                 }));
 
                 for (let i = 0; i < toInsert.length; i += batchSize) {
@@ -3611,6 +3735,7 @@
                     "Cat. Jogo": r.gameCategory || '-',
                     "QM": r.qmClassification || '-',
                     "Valor QM": Number(r.qmValue) || 0,
+                    ...qmAuditExportColumns(r),
                     "Chapa": globalData.employees.find(e => e.id === r.employeeId)?.registration || '-',
                     "Funcionário": r.employeeName || 'N/A',
                     "Setor": r.sector || '-',
@@ -3634,6 +3759,240 @@
         // Renderiza o Arquivamento com registros arquivados.
         // Admins veem todos os setores; gestores veem apenas os registros das suas equipes
         // (aplicado via RLS). Somente admins podem excluir registros arquivados.
+        // --- Log de Auditoria (somente admin) ---
+        // Lê public.audit_log, preenchida por gatilhos no banco (migrations/2026-10-07_audit_log.sql).
+        const AUDIT_TABLE_LABELS = {
+            records: 'Lançamento QM', archived_records: 'Lançamento QM', employees: 'Funcionário',
+            users_profile: 'Usuário', sectors: 'Setor', categories: 'Categoria', rules: 'Regra',
+        };
+        const AUDIT_FIELD_LABELS = {
+            name: 'Nome', registration: 'Matrícula', sector: 'Setor', sectors: 'Setores', can_use_grade_a: 'Pode usar Grau A',
+            is_manager: 'Gestor', is_admin: 'Administrador', email: 'E-mail', description: 'Descrição',
+            event_name: 'Evento', event_date: 'Data do evento', game_time: 'Horário', event_type: 'Tipo de evento',
+            game_category: 'Categoria', qm_classification: 'QM', qm_value: 'Valor QM', employee_id: 'Funcionário (id)',
+            employee_name: 'Funcionário', notes: 'Observações', manager_id: 'Gestor (id)', manager_name: 'Gestor',
+            field: 'Campo', type: 'Tipo', limit_days: 'Dias limite', working_days: 'Dias úteis', message: 'Mensagem',
+        };
+        const AUDIT_HIDDEN_FIELDS = new Set(['id', 'uid', 'created_at', 'created_by']);
+
+        function auditFmtVal(v) {
+            if (v === null || v === undefined || v === '') return '(vazio)';
+            if (typeof v === 'boolean') return v ? 'Sim' : 'Não';
+            if (Array.isArray(v)) return v.length ? v.join(', ') : '(vazio)';
+            return String(v);
+        }
+
+        function auditDiff(e) {
+            return (e.changed_fields || [])
+                .filter(f => !AUDIT_HIDDEN_FIELDS.has(f))
+                .map(f => `${AUDIT_FIELD_LABELS[f] || f}: ${auditFmtVal(e.old_data?.[f])} → ${auditFmtVal(e.new_data?.[f])}`)
+                .join('; ');
+        }
+
+        // "QM C para Fulano · evento "X" em 07/10/2026 às 10:00 · lançado A · regra: Dia útil antes das 21h ..."
+        function auditDescribeQM(row) {
+            if (!row) return '';
+            const r = fromDB(row);
+            const a = qmAuditInfo(r);
+            const date = r.eventDate ? new Date(r.eventDate + 'T00:00:00').toLocaleDateString('pt-BR') : '?';
+            const parts = [
+                `QM ${r.qmClassification || '-'} para ${r.employeeName || '?'}`,
+                `evento "${r.eventName || '?'}" em ${date}${r.gameTime ? ' às ' + r.gameTime : ''}`,
+                `lançado ${a.input}`,
+            ];
+            if (a.rule) parts.push(`regra: ${a.rule}`);
+            if (a.hasLog) parts.push(`habilitado Grau A: ${a.enabled}`, `origem: ${a.source}`);
+            if (r.sector) parts.push(`setor: ${r.sector}`);
+            return parts.join(' · ');
+        }
+
+        function describeAuditEntry(e) {
+            const t = e.table_name, act = e.action;
+            const d = e.new_data || e.old_data || {};
+            const rebuilt = e.source === 'reconstruido';
+
+            if (t === 'records' || t === 'archived_records') {
+                const labels = {
+                    INSERT: 'Lançou QM', UPDATE: 'Alterou lançamento', ARCHIVE: 'Arquivou lançamento', UNARCHIVE: 'Desarquivou lançamento',
+                    DELETE: t === 'archived_records' ? 'Excluiu lançamento arquivado' : 'Excluiu lançamento',
+                };
+                const detail = act === 'UPDATE' ? `${auditDescribeQM(e.new_data)} — ${auditDiff(e)}` : auditDescribeQM(d);
+                return { action: labels[act] || act, detail };
+            }
+            if (t === 'employees') {
+                const name = d.name || '?';
+                if (act === 'INSERT') {
+                    const sectors = auditFmtVal(d.sectors?.length ? d.sectors : d.sector);
+                    const gradeA = d.can_use_grade_a ? 'Sim' : 'Não';
+                    const note = rebuilt ? ' (situação atual; mudanças de habilitação anteriores ao log não foram registradas)' : '';
+                    return { action: 'Cadastrou funcionário', detail: `${name}${d.registration ? ' (matrícula ' + d.registration + ')' : ''} · setores: ${sectors} · Grau A: ${gradeA}${note}` };
+                }
+                if (act === 'UPDATE') {
+                    const changed = e.changed_fields || [];
+                    const action = changed.includes('can_use_grade_a')
+                        ? (e.new_data?.can_use_grade_a ? 'Habilitou Grau A' : 'Desabilitou Grau A')
+                        : 'Alterou funcionário';
+                    return { action, detail: `${name} — ${auditDiff(e)}` };
+                }
+                if (act === 'DELETE') return { action: 'Excluiu funcionário', detail: name };
+            }
+            if (t === 'users_profile') {
+                const who = `${d.name || '?'}${d.email ? ' (' + d.email + ')' : ''}`;
+                if (act === 'INSERT') {
+                    const profile = [d.is_admin ? 'Admin' : null, d.is_manager ? 'Gestor' : null].filter(Boolean).join(' + ') || 'sem perfil';
+                    return { action: 'Criou usuário', detail: `${who} · ${profile} · setores: ${auditFmtVal(d.sectors?.length ? d.sectors : d.sector)}` };
+                }
+                if (act === 'UPDATE') return { action: 'Alterou usuário', detail: `${who} — ${auditDiff(e)}` };
+                if (act === 'DELETE') return { action: 'Excluiu usuário', detail: who };
+            }
+            const label = (AUDIT_TABLE_LABELS[t] || t).toLowerCase();
+            const verb = { INSERT: 'Criou', UPDATE: 'Alterou', DELETE: 'Excluiu' }[act] || act;
+            return { action: `${verb} ${label}`, detail: act === 'UPDATE' ? `${d.name || ''} — ${auditDiff(e)}` : (d.name || d.description || '') };
+        }
+
+        function auditActorLabel(e) {
+            if (e.actor_name) return e.actor_name;
+            if (e.actor_id) return 'Usuário excluído';
+            return e.source === 'reconstruido' ? 'Não registrado' : 'Sistema / SQL';
+        }
+
+        async function renderAuditLogPage() {
+            if (!userProfile?.isAdmin) { currentView = 'login'; renderApp(); return; }
+            const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            const inp = `px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none`;
+
+            appContent.innerHTML = `
+                <div class="animate-fadeIn space-y-5">
+                    <div class="exec-card p-5">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <p style="font-size:11px;font-weight:600;color:var(--apple-2nd);letter-spacing:.04em;text-transform:uppercase">Auditoria</p>
+                                <h2 style="font-size:20px;font-weight:700;color:var(--apple-text);margin-top:2px">Log de Auditoria</h2>
+                                <p style="font-size:12px;color:var(--apple-3rd);margin-top:2px">Quem lançou, alterou, habilitou, arquivou ou excluiu — e quando</p>
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <button id="btn-audit-export" class="btn-primary" style="font-size:12px;padding:7px 12px" disabled>XLSX</button>
+                                <button id="btn-audit-back" class="btn-secondary" style="font-size:12px;padding:7px 12px">← Voltar</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="audit-content" class="exec-card p-10 text-center">
+                        <div style="display:flex;justify-content:center"><div class="loader"></div></div>
+                        <p style="font-size:13px;color:#64748b;margin-top:12px">Carregando log...</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('btn-audit-back').onclick = () => { currentView = 'adminDashboard'; renderApp(); };
+
+            let entries;
+            try {
+                const raw = await fetchAllPages('audit_log', q => q.order('occurred_at', { ascending: false }).order('id', { ascending: false }));
+                entries = raw.map(e => ({ ...e, ...describeAuditEntry(e), actor: auditActorLabel(e), typeLabel: AUDIT_TABLE_LABELS[e.table_name] || e.table_name }));
+            } catch (err) {
+                console.error('[renderAuditLogPage]', err);
+                const missing = /audit_log/.test(String(err?.message || ''));
+                document.getElementById('audit-content').innerHTML = `<p style="font-size:13px;color:#b91c1c">${missing
+                    ? 'O log de auditoria ainda não foi ativado. Execute <strong>migrations/2026-10-07_audit_log.sql</strong> no SQL Editor do Supabase.'
+                    : 'Erro ao carregar o log: ' + esc(err?.message || err)}</p>`;
+                return;
+            }
+
+            const uniq = (arr) => [...new Set(arr.filter(Boolean))].sort(compareNames);
+            const actors = uniq(entries.map(e => e.actor));
+            const types = uniq(entries.map(e => e.typeLabel));
+            const actions = uniq(entries.map(e => e.action));
+            const opts = (arr) => arr.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+            const MAX_ROWS = 1000;
+
+            const content = document.getElementById('audit-content');
+            content.className = 'exec-card p-5';
+            content.innerHTML = `
+                <div style="font-size:12px;color:var(--ink-2);background:var(--bg-alt);border-radius:10px;padding:10px 14px;margin-bottom:14px;line-height:1.5">
+                    <strong>Registrado no momento</strong>: gravado pelo banco quando a ação aconteceu (usuário e valores antes/depois).
+                    <strong>Reconstruído</strong>: montado a partir dos dados que já existiam antes do log (quem cadastrou, quem lançou, quem arquivou).
+                    Alterações anteriores ao log — como quem marcou "Pode Grau A" — e registros excluídos antes dele não ficaram gravados.
+                    "Lançado A (deduzido)" = grau deduzido da classificação final (A/C ⇒ A, B/D ⇒ B).
+                </div>
+                <div class="flex flex-wrap gap-2 items-end" style="margin-bottom:14px">
+                    <input id="audit-f-search" type="text" placeholder="Buscar (funcionário, evento, detalhe...)" class="${inp}" style="min-width:240px;flex:1">
+                    <select id="audit-f-actor" class="${inp}"><option value="">Todos os usuários</option>${opts(actors)}</select>
+                    <select id="audit-f-type" class="${inp}"><option value="">Todos os tipos</option>${opts(types)}</select>
+                    <select id="audit-f-action" class="${inp}"><option value="">Todas as ações</option>${opts(actions)}</select>
+                    <select id="audit-f-source" class="${inp}"><option value="">Toda origem</option><option value="trigger">Registrado no momento</option><option value="reconstruido">Reconstruído</option></select>
+                    <label style="font-size:11px;color:var(--ink-3)">De <input id="audit-f-start" type="date" class="${inp}"></label>
+                    <label style="font-size:11px;color:var(--ink-3)">Até <input id="audit-f-end" type="date" class="${inp}"></label>
+                    <button id="audit-f-clear" class="btn-secondary" style="font-size:12px;padding:7px 12px">Limpar</button>
+                </div>
+                <p id="audit-count" style="font-size:12px;color:var(--ink-3);margin-bottom:8px"></p>
+                <div id="audit-table"></div>
+            `;
+
+            let filtered = entries;
+            const fmtWhen = (iso) => new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+            const sourceLabel = (e) => e.source === 'reconstruido' ? 'Reconstruído' : 'Registrado no momento';
+            const localDay = (iso) => { const dt = new Date(iso); return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`; };
+
+            const apply = () => {
+                const val = (id) => document.getElementById(id).value;
+                const search = val('audit-f-search').trim().toLowerCase();
+                const actor = val('audit-f-actor'), type = val('audit-f-type'), action = val('audit-f-action'), source = val('audit-f-source');
+                const start = val('audit-f-start'), end = val('audit-f-end');
+                filtered = entries.filter(e =>
+                    (!actor || e.actor === actor) && (!type || e.typeLabel === type) && (!action || e.action === action)
+                    && (!source || e.source === source)
+                    && (!start || localDay(e.occurred_at) >= start) && (!end || localDay(e.occurred_at) <= end)
+                    && (!search || `${e.actor} ${e.action} ${e.detail} ${e.actor_email || ''}`.toLowerCase().includes(search)));
+
+                const shown = filtered.slice(0, MAX_ROWS);
+                document.getElementById('audit-count').textContent = `${filtered.length} evento(s)` + (filtered.length > MAX_ROWS ? ` — exibindo os ${MAX_ROWS} mais recentes; o XLSX traz todos` : '');
+                document.getElementById('audit-table').innerHTML = shown.length === 0
+                    ? `<p style="font-size:13px;color:#64748b;text-align:center;padding:40px 0">Nenhum evento encontrado</p>`
+                    : `<div class="tbl-scroll-wrap border border-slate-100 rounded-xl"><table class="tbl min-w-full">
+                        <thead><tr><th style="padding-left:16px">Data/hora</th><th>Usuário</th><th>Tipo</th><th>Ação</th><th>Detalhes</th><th>Origem</th></tr></thead>
+                        <tbody>${shown.map(e => `
+                            <tr class="tbl-row">
+                                <td class="text-xs text-slate-500 whitespace-nowrap" style="padding:10px 16px">${fmtWhen(e.occurred_at)}</td>
+                                <td class="text-xs text-slate-700 font-medium whitespace-nowrap" style="padding:10px 16px" title="${esc(e.actor_email || '')}">${esc(e.actor)}</td>
+                                <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${esc(e.typeLabel)}</td>
+                                <td class="text-xs whitespace-nowrap" style="padding:10px 16px;font-weight:600;color:${/Grau A|Excluiu/.test(e.action) ? '#b45309' : 'var(--ink)'}">${esc(e.action)}</td>
+                                <td class="text-xs text-slate-600" style="padding:10px 16px;min-width:320px">${esc(e.detail)}</td>
+                                <td class="text-xs whitespace-nowrap" style="padding:10px 16px;color:${e.source === 'reconstruido' ? '#94a3b8' : 'var(--ink-2)'}">${sourceLabel(e)}</td>
+                            </tr>`).join('')}</tbody></table></div>`;
+            };
+
+            ['audit-f-actor', 'audit-f-type', 'audit-f-action', 'audit-f-source', 'audit-f-start', 'audit-f-end']
+                .forEach(id => document.getElementById(id).addEventListener('change', apply));
+            document.getElementById('audit-f-search').addEventListener('input', apply);
+            document.getElementById('audit-f-clear').onclick = () => {
+                ['audit-f-search', 'audit-f-actor', 'audit-f-type', 'audit-f-action', 'audit-f-source', 'audit-f-start', 'audit-f-end']
+                    .forEach(id => { document.getElementById(id).value = ''; });
+                apply();
+            };
+
+            const exportBtn = document.getElementById('btn-audit-export');
+            exportBtn.disabled = false;
+            exportBtn.onclick = () => {
+                if (typeof XLSX === 'undefined') { showNotification('Erro: Biblioteca XLSX não carregada.', 'error'); return; }
+                if (filtered.length === 0) { showNotification('Nenhum evento para exportar.', 'info'); return; }
+                const sheet = filtered.map(e => ({
+                    "Data/Hora": fmtWhen(e.occurred_at),
+                    "Usuário": e.actor,
+                    "E-mail": e.actor_email || '',
+                    "Tipo": e.typeLabel,
+                    "Ação": e.action,
+                    "Detalhes": e.detail,
+                    "Origem": sourceLabel(e),
+                    "ID do Item": e.row_id || '',
+                }));
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheet), 'Log de Auditoria');
+                XLSX.writeFile(wb, `log_auditoria_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                showNotification('XLSX exportado com sucesso!', 'success');
+            };
+
+            apply();
+        }
+
         async function renderHistoricoGeral() {
             if (!userProfile?.isAdmin && !userProfile?.isManager) { currentView = 'login'; renderApp(); return; }
             const canDelete = !!userProfile?.isAdmin;
@@ -3698,7 +4057,7 @@
                                 <p class="text-xs text-slate-500">${r.eventDate?new Date(r.eventDate+'T00:00:00').toLocaleDateString('pt-BR'):'N/A'}${r.gameTime?' · '+r.gameTime:''}</p>
                             </td>
                             <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px;max-width:140px;overflow:hidden;text-overflow:ellipsis">${r.gameCategory||'N/A'}</td>
-                            <td class="whitespace-nowrap text-center" style="padding:10px 16px">${qmBadge(r.qmClassification)}</td>
+                            <td class="whitespace-nowrap text-center" style="padding:10px 16px">${qmBadge(r.qmClassification)}${qmAuditSubline(r)}</td>
                             <td class="text-xs text-slate-700 font-medium whitespace-nowrap" style="padding:10px 16px">${r.employeeName||'N/A'}</td>
                             <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${r.sector||'-'}</td>
                             <td class="text-xs text-slate-600 whitespace-nowrap" style="padding:10px 16px">${r.managerName||'-'}</td>
@@ -4029,6 +4388,7 @@
                         "Horário": r.gameTime||'-',
                         "Cat. Jogo": r.gameCategory||'N/A',
                         "QM": r.qmClassification||'-',
+                        ...qmAuditExportColumns(r),
                         "Chapa": globalData.employees.find(e=>e.id===r.employeeId)?.registration||'-',
                         "Funcionário": r.employeeName||'N/A',
                         "Setor": r.sector||'N/A',
@@ -5488,7 +5848,7 @@
             if (!records || records.length === 0) {
                 showNotification("Nenhum dado para exportar.", "info"); return;
             }
-            const headers = ["Data Criação", "Evento", "Data Evento", "Horário", "Cat. Jogo", "QM", "Valor QM", "Chapa", "Funcionário", "Setor", "Gestor Lançador", "Observações"];
+            const headers = ["Data Criação", "Evento", "Data Evento", "Horário", "Cat. Jogo", "QM", "Valor QM", "QM Lançado (Gestor)", "Grau Aplicado", "Regra Aplicada", "Func. Habilitado Grau A", "Origem Lançamento", "Chapa", "Funcionário", "Setor", "Gestor Lançador", "Observações"];
             let csvContent = headers.join(",") + "\\n";
 
             records.forEach(record => {
@@ -5501,6 +5861,7 @@
                     `"${(record.gameCategory || record.categoryName || 'N/A').replace(/"/g, '""')}"`,
                     record.qmClassification || '-',
                     record.qmValue ? `R$ ${record.qmValue}` : '-',
+                    ...(a => [a.input, a.applied || '-', a.rule || '-', a.enabled || '-', a.source || '-'])(qmAuditInfo(record)),
                     `"${empChapa}"`,
                     `"${(record.employeeName || 'N/A').replace(/"/g, '""')}"`,
                     `"${(record.sector || 'N/A').replace(/"/g, '""')}"`,
@@ -5540,6 +5901,7 @@
                     "Horário": record.gameTime || '-',
                     "Cat. Jogo": record.gameCategory || record.categoryName || 'N/A',
                     "QM": record.qmClassification || '-',
+                    ...qmAuditExportColumns(record),
                     "Chapa": empChapa,
                     "Funcionário": record.employeeName || 'N/A',
                     "Setor": record.sector || 'N/A',
